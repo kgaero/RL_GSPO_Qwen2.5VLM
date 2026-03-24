@@ -28,6 +28,23 @@ from .rewarding import RewardRuntimeContext, build_reward_functions
 LOGGER = logging.getLogger(__name__)
 
 
+def log_cuda_environment() -> None:
+    """Log visible CUDA devices and warn when multiple GPUs are present but unused."""
+
+    if not torch.cuda.is_available():
+        LOGGER.warning("CUDA is not available. This pipeline expects a GPU-backed runtime.")
+        return
+
+    device_count = torch.cuda.device_count()
+    device_names = [torch.cuda.get_device_name(index) for index in range(device_count)]
+    LOGGER.info("Visible CUDA devices: %s | %s", device_count, device_names)
+    if device_count > 1:
+        LOGGER.warning(
+            "Multiple GPUs are visible, but the current runner does not configure DDP or tensor parallelism. "
+            "Training and vLLM evaluation remain effectively single-GPU unless the launch path is extended."
+        )
+
+
 def build_component_bounds(phase_config) -> dict[str, tuple[float, float]]:
     """Return min/max bounds for every reward component."""
 
@@ -223,6 +240,8 @@ def run_phase(run_config: RunConfig, phase_name: Optional[str] = None, resume_se
     """Run one explicit phase of staged RL training."""
 
     from trl import GRPOTrainer  # pylint: disable=import-error
+
+    log_cuda_environment()
 
     resolved_phase = phase_name or run_config.phase_name
     phase_config = run_config.phases[resolved_phase]

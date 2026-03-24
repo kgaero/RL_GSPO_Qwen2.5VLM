@@ -136,6 +136,18 @@ class ResumeSelector:
 
 
 @dataclass
+class HardwareProfileSpec:
+    """Named runtime profile used to adapt the same pipeline to smaller GPUs."""
+
+    name: str
+    description: str
+    model_overrides: Mapping[str, Any] = field(default_factory=dict)
+    trainer_overrides: Mapping[str, Any] = field(default_factory=dict)
+    eval_overrides: Mapping[str, Any] = field(default_factory=dict)
+    phase_trainer_overrides: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+
+
+@dataclass
 class EvalConfig:
     """Evaluation generation settings."""
 
@@ -225,6 +237,7 @@ class RunConfig:
     eval_split: str = "testmini"
     output_root: str = "outputs_staged"
     phase_name: str = "phase_a"
+    hardware_profile_name: str = "default"
     model: ModelConfig = field(default_factory=ModelConfig)
     trainer_defaults: TrainerDefaults = field(default_factory=TrainerDefaults)
     eval: EvalConfig = field(default_factory=EvalConfig)
@@ -413,6 +426,68 @@ def build_default_phase_specs() -> dict[str, PhaseConfig]:
     }
 
 
+def build_default_hardware_profiles() -> dict[str, HardwareProfileSpec]:
+    """Return named hardware profiles for smaller or shared GPU environments."""
+
+    return {
+        "default": HardwareProfileSpec(
+            name="default",
+            description="Default profile with the standard staged RL settings.",
+        ),
+        "kaggle_t4": HardwareProfileSpec(
+            name="kaggle_t4",
+            description="Conservative single-GPU Kaggle T4 profile with shorter completions and lighter eval.",
+            model_overrides={
+                "max_seq_length": 4096,
+                "gpu_memory_utilization": 0.55,
+                "lora_rank": 8,
+                "lora_alpha": 8,
+            },
+            trainer_overrides={
+                "gradient_accumulation_steps": 4,
+                "num_generations": 2,
+                "max_prompt_length": 896,
+                "max_completion_length": 160,
+            },
+            eval_overrides={
+                "num_samples_per_prompt": 2,
+                "max_eval_examples_per_subset": 8,
+            },
+            phase_trainer_overrides={
+                "phase_d": {"max_completion_length": 224},
+            },
+        ),
+    }
+
+
+def _apply_simple_overrides(target: Any, overrides: Mapping[str, Any]) -> None:
+    for key, value in overrides.items():
+        setattr(target, key, value)
+
+
+def apply_hardware_profile(run_config: RunConfig, profile_name: Optional[str]) -> RunConfig:
+    """Apply named hardware overrides while keeping CLI-specific overrides possible afterwards."""
+
+    resolved_name = profile_name or "default"
+    profiles = build_default_hardware_profiles()
+    if resolved_name not in profiles:
+        available = ", ".join(sorted(profiles))
+        raise ValueError(f"Unknown hardware profile '{resolved_name}'. Available profiles: {available}")
+
+    profile = profiles[resolved_name]
+    run_config.hardware_profile_name = profile.name
+    _apply_simple_overrides(run_config.model, profile.model_overrides)
+    _apply_simple_overrides(run_config.trainer_defaults, profile.trainer_overrides)
+    _apply_simple_overrides(run_config.eval, profile.eval_overrides)
+    for phase_name, overrides in profile.phase_trainer_overrides.items():
+        if phase_name not in run_config.phases:
+            continue
+        merged = dict(run_config.phases[phase_name].trainer_overrides)
+        merged.update(dict(overrides))
+        run_config.phases[phase_name].trainer_overrides = merged
+    return run_config
+
+
 def build_default_run_config(phase_name: str = "phase_a") -> RunConfig:
     """Build the default configuration used by the refactored runner."""
 
@@ -424,4 +499,3 @@ def build_default_run_config(phase_name: str = "phase_a") -> RunConfig:
         phases=phases,
         multichoice_scaffold_enabled=True,
     )
-

@@ -9,7 +9,7 @@ from pathlib import Path
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-from staged_rl.config import build_default_run_config
+from staged_rl.config import apply_hardware_profile, build_default_hardware_profiles, build_default_run_config
 from staged_rl.data import analyze_dataset_records, dataset_to_records, load_mathvista_split, save_dataset_analysis
 from staged_rl.diagnostics import save_json
 
@@ -39,6 +39,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", default=None, help="Override the default output root.")
     parser.add_argument("--train-split", default=None, help="Override the training split name.")
     parser.add_argument("--eval-split", default=None, help="Override the evaluation split name.")
+    parser.add_argument(
+        "--hardware-profile",
+        default="default",
+        choices=sorted(build_default_hardware_profiles().keys()),
+        help="Runtime profile for smaller GPUs, for example kaggle_t4.",
+    )
     parser.add_argument(
         "--max-eval-examples-per-subset",
         type=int,
@@ -74,6 +80,7 @@ def apply_cli_overrides(run_config, args: argparse.Namespace):
     """Update the default run config from CLI overrides."""
 
     run_config.phase_name = args.phase
+    run_config = apply_hardware_profile(run_config, args.hardware_profile)
     if args.output_root:
         run_config.output_root = args.output_root
     if args.train_split:
@@ -132,6 +139,7 @@ def main() -> None:
             "output_root": run_config.output_root,
             "train_split": run_config.train_split,
             "eval_split": run_config.eval_split,
+            "hardware_profile": run_config.hardware_profile_name,
             "disabled_stages": args.disable_stage,
             "enabled_stages": args.enable_stage,
             "enable_multichoice_training": args.enable_multichoice_training,

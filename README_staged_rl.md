@@ -10,6 +10,12 @@ Run Phase A:
 python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_a
 ```
 
+Run Phase A with the conservative Kaggle T4 profile:
+
+```bash
+python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_a --hardware-profile kaggle_t4
+```
+
 Run Phase B from the best structure checkpoint found in Phase A:
 
 ```bash
@@ -33,6 +39,18 @@ Warm-start from a manual checkpoint path:
 ```bash
 python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_d --resume outputs_staged/phase_c/checkpoint-120
 ```
+
+The `kaggle_t4` profile keeps the same staged pipeline but trims runtime pressure:
+
+- `max_seq_length=4096`
+- `lora_rank=8`
+- `num_generations=2`
+- `max_prompt_length=896`
+- `max_completion_length=160`
+- `num_samples_per_prompt=2`
+- `max_eval_examples_per_subset=8`
+
+If multiple GPUs are visible, the current runner logs that fact but still operates as a single-process, single-GPU pipeline. It does not set up DDP or tensor parallelism automatically.
 
 ## Stage Controls
 
