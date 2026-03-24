@@ -1,0 +1,106 @@
+# Staged Metric-Gated RL for Qwen2.5-VL
+
+This repo now runs MathVista GRPO training through explicit phases with stage-aware data filtering, metric-gated reward weights, checkpoint-side evaluation, and named checkpoint aliases.
+
+## Phase Runs
+
+Run Phase A:
+
+```bash
+python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_a
+```
+
+Run Phase B from the best structure checkpoint found in Phase A:
+
+```bash
+python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_b --resume best_structure
+```
+
+Run Phase C from the best composite checkpoint found so far:
+
+```bash
+python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_c --resume best_composite
+```
+
+Resume the current phase from its latest checkpoint:
+
+```bash
+python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_c --resume latest
+```
+
+Warm-start from a manual checkpoint path:
+
+```bash
+python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_d --resume outputs_staged/phase_c/checkpoint-120
+```
+
+## Stage Controls
+
+Disable a stage:
+
+```bash
+python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_b --disable-stage stage3_hard_numeric
+```
+
+Enable the optional robustness stage for analysis:
+
+```bash
+python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_a --enable-stage stage5_robustness --dataset-analysis-only
+```
+
+Phase E multi-choice training stays disabled by default. The scaffold is present, but training only runs if you opt in:
+
+```bash
+python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_e --enable-multichoice-training
+```
+
+## Reward Gating
+
+Reward components are logged separately as:
+
+- `format_reward`
+- `parseable_reward`
+- `finished_reward`
+- `correctness_reward`
+- `brevity_reward`
+- `tolerance_reward`
+
+After each checkpoint evaluation, the reward controller updates weights using held-out metrics from `testmini`.
+
+- Low parseability keeps `parseable_reward` elevated.
+- Missing or broken tags keep `format_reward` elevated.
+- High truncation increases `finished_reward` and keeps brevity pressure on.
+- Stable structure with stalled exact match increases `correctness_reward`.
+- Structure rewards never decay fully to zero.
+
+Checkpoint artifacts are written into each checkpoint directory:
+
+- `eval_metrics.json`
+- `subset_metrics.json`
+- `reward_weights.json`
+- `controller_state.json`
+- `summary.txt`
+- `per_sample_records.jsonl`
+- `per_prompt_records.json`
+
+Run-level alias files are written under `outputs_staged/<phase>/aliases/` for:
+
+- `latest`
+- `best_structure`
+- `best_correctness`
+- `best_composite`
+
+## Dataset Analysis
+
+Save train/eval split analysis without starting training:
+
+```bash
+python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_a --dataset-analysis-only
+```
+
+This writes:
+
+- `dataset_analysis_train.json`
+- `dataset_analysis_eval.json`
+
+The analysis includes counts by metadata field, stage sizes, sample examples, and warnings for tiny or heterogeneous stages.

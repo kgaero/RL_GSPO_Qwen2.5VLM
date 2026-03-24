@@ -1,0 +1,32 @@
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Common local tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# OS-specific noise
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
+
+# Repo-local generated training artifacts
+outputs/
+outputs_staged/
+grpo_lora/
+grpo_trainer_lora_model/
+grpo_eval_outputs/
+unsloth_compiled_cache/
+
+# Large model/checkpoint artifacts
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Local analysis export
+RL Qwen Model Analysis.docx
