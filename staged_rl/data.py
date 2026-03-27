@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 from collections import Counter
@@ -96,6 +97,50 @@ def resize_and_convert_image(image: Any, image_size: int = 512) -> Any:
     return image
 
 
+def _load_image_payload(image_path: Optional[str] = None, image_bytes: Optional[bytes] = None) -> Any:
+    """Best-effort decode for dataset image payloads."""
+
+    try:
+        from PIL import Image  # pylint: disable=import-error
+    except Exception:
+        return None
+
+    if image_bytes:
+        with Image.open(io.BytesIO(image_bytes)) as opened:
+            return opened.copy()
+    if image_path:
+        with Image.open(image_path) as opened:
+            return opened.copy()
+    return None
+
+
+def normalize_image_payload(image: Any, image_size: int = 512) -> Any:
+    """Normalize image payloads into processor-friendly objects."""
+
+    if image is None:
+        return None
+    if isinstance(image, list):
+        return [normalize_image_payload(item, image_size=image_size) for item in image]
+    if hasattr(image, "resize"):
+        return resize_and_convert_image(image, image_size=image_size)
+    if isinstance(image, dict):
+        decoded = _load_image_payload(
+            image_path=image.get("path"),
+            image_bytes=image.get("bytes"),
+        )
+        if decoded is not None:
+            return resize_and_convert_image(decoded, image_size=image_size)
+        if image.get("path"):
+            return image["path"]
+        return None
+    if isinstance(image, str):
+        decoded = _load_image_payload(image_path=image)
+        if decoded is not None:
+            return resize_and_convert_image(decoded, image_size=image_size)
+        return image
+    return image
+
+
 def enrich_example(example: dict[str, Any], image_size: int = 512) -> dict[str, Any]:
     """Add flattened metadata fields used by filters, rewards, and diagnostics."""
 
@@ -108,7 +153,10 @@ def enrich_example(example: dict[str, Any], image_size: int = 512) -> dict[str, 
     updated["precision"] = example.get("precision")
     updated["unit"] = normalize_text_field(example.get("unit"))
     updated["image_path"] = example.get("image")
-    updated["image"] = resize_and_convert_image(example.get("decoded_image"), image_size=image_size)
+    updated["image"] = normalize_image_payload(
+        example.get("decoded_image") if example.get("decoded_image") is not None else example.get("image"),
+        image_size=image_size,
+    )
     updated["gold_option_letter"] = compute_option_letter(example.get("answer"), example.get("choices"))
     return updated
 
@@ -239,6 +287,23 @@ def _maybe_apply_chat_template(dataset, tokenizer) -> Any:
     )
 
 
+def _apply_runtime_image_transform(dataset, image_size: int = 512) -> Any:
+    """Decode image payloads at access time so TRL sees PIL images, not dataset dicts."""
+
+    def _transform(batch: Mapping[str, Any]) -> dict[str, Any]:
+        materialized = dict(batch)
+        if "image" not in materialized:
+            return materialized
+        images = materialized["image"]
+        if isinstance(images, list):
+            materialized["image"] = [normalize_image_payload(image, image_size=image_size) for image in images]
+        else:
+            materialized["image"] = normalize_image_payload(images, image_size=image_size)
+        return materialized
+
+    return dataset.with_transform(_transform)
+
+
 def _assert_numeric_stage_records(dataset, stage_spec: StageSpec) -> None:
     if stage_spec.answer_mode != "numeric_free_form":
         return
@@ -262,11 +327,11 @@ def load_mathvista_split(run_config: RunConfig, split_name: str):
 
     load_dataset, _ = _load_dataset_imports()
     dataset = load_dataset(run_config.dataset_name, split=split_name)
-    dataset = dataset.map(lambda example: enrich_example(example))
+    dataset = dataset.map(lambda example: enrich_example(example, image_size=run_config.model.image_size))
     return dataset
 
 
-def build_stage_dataset(base_dataset, stage_spec: StageSpec, tokenizer) -> Any:
+def build_stage_dataset(base_dataset, stage_spec: StageSpec, tokenizer, image_size: int = 512) -> Any:
     """Filter, score, and prompt-format a stage dataset."""
 
     dataset = base_dataset.filter(lambda example: match_filter_spec(example, stage_spec.filter_spec))
@@ -299,10 +364,17 @@ def build_stage_dataset(base_dataset, stage_spec: StageSpec, tokenizer) -> Any:
     dataset = dataset.remove_columns([name for name in ("decoded_image",) if name in dataset.column_names])
     _assert_numeric_stage_records(dataset, stage_spec)
     dataset = _maybe_apply_chat_template(dataset, tokenizer)
+    dataset = _apply_runtime_image_transform(dataset, image_size=image_size)
     return dataset
 
 
-def build_phase_train_dataset(base_dataset, phase_config: PhaseConfig, stage_specs: Mapping[str, StageSpec], tokenizer):
+def build_phase_train_dataset(
+    base_dataset,
+    phase_config: PhaseConfig,
+    stage_specs: Mapping[str, StageSpec],
+    tokenizer,
+    image_size: int = 512,
+):
     """Build the training dataset for a phase."""
 
     _, interleave_datasets = _load_dataset_imports()
@@ -311,7 +383,12 @@ def build_phase_train_dataset(base_dataset, phase_config: PhaseConfig, stage_spe
         stage_spec = stage_specs[stage_name]
         if stage_spec.answer_mode == "multi_choice" and not phase_config.allow_multichoice_training:
             raise ValueError("Phase E multi-choice training is scaffolded only and remains disabled.")
-        stage_datasets[stage_name] = build_stage_dataset(base_dataset, stage_spec, tokenizer)
+        stage_datasets[stage_name] = build_stage_dataset(
+            base_dataset,
+            stage_spec,
+            tokenizer,
+            image_size=image_size,
+        )
 
     if len(stage_datasets) == 1:
         only_stage = next(iter(stage_datasets.values()))
@@ -326,6 +403,7 @@ def build_phase_train_dataset(base_dataset, phase_config: PhaseConfig, stage_spe
         seed=3407,
         stopping_strategy="all_exhausted",
     )
+    mixed_dataset = _apply_runtime_image_transform(mixed_dataset, image_size=image_size)
     return mixed_dataset, stage_datasets
 
 
@@ -345,12 +423,22 @@ def build_eval_datasets(base_eval_dataset, run_config: RunConfig, tokenizer) -> 
         answer_mode="numeric_free_form",
         filter_spec=numeric_filter,
     )
-    eval_datasets[numeric_stage.name] = build_stage_dataset(base_eval_dataset, numeric_stage, tokenizer)
+    eval_datasets[numeric_stage.name] = build_stage_dataset(
+        base_eval_dataset,
+        numeric_stage,
+        tokenizer,
+        image_size=run_config.model.image_size,
+    )
 
     for stage_name, stage_spec in run_config.stages.items():
         if not stage_spec.enabled and stage_name != "stage4_multi_choice":
             continue
-        eval_datasets[stage_name] = build_stage_dataset(base_eval_dataset, stage_spec, tokenizer)
+        eval_datasets[stage_name] = build_stage_dataset(
+            base_eval_dataset,
+            stage_spec,
+            tokenizer,
+            image_size=run_config.model.image_size,
+        )
     return eval_datasets
 
 

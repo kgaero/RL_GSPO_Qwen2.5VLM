@@ -1,0 +1,10 @@
+Knob,Default,Kaggle T4,Why it reduced memory pressure,Tradeoff accepted
+max_seq_length,16384,1280,Shorter sequence length lowers attention KV-cache and activation footprint.,Less room for long-context reasoning.
+image_size,512,336,Smaller images make the vision encoder cheaper during generation and training.,Lower visual detail fidelity.
+LoRA Rank,16,8,Lower-rank adapters shrink trainable state and optimizer footprint.,Lower adaptation capacity.
+num_generations,4,2,Fewer sampled completions reduce generation-time memory pressure and runtime.,Lower exploration / diversity per prompt.
+max_prompt_length,1024,320,Shorter prompt budget reduces prefill memory and attention cache size.,Less room for long question context.
+max_completion_length,256,64,Shorter completion budget caps generation-time memory and reduces truncation risk.,Less room for verbose reasoning.
+gpu_memory_utilization,0.8,0.65,A more conservative allocator target reduces vLLM cache pressure on T4.,Leaves less headroom for aggressive throughput.
+compilation mode,default / unspecified,"PIECEWISE, level=3",T4-safe piecewise cudagraph mode avoided unstable full-graph capture paths.,More conservative runtime path than the highest-throughput configuration.
+max_eval_examples_per_subset,,2,Smaller checkpoint-time eval batches reduce memory and runtime at save/eval boundaries.,Noisier checkpoint selection on tiny smoke runs.

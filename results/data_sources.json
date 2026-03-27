@@ -1,0 +1,42 @@
+{
+  "repo_root": "/home/kgaer/code/RL_GSPO_Qwen2.5VLM",
+  "baseline_metrics": "/home/kgaer/code/RL_GSPO_Qwen2.5VLM/grpo_eval_outputs/eval_metrics.json",
+  "baseline_train_log_summary": "/home/kgaer/code/RL_GSPO_Qwen2.5VLM/grpo_eval_outputs/train_log_summary.json",
+  "run_sources": [
+    {
+      "run_family": "smoke_testmini",
+      "notebook_slug": "mcgmcg1/rl-gspo-qwen2-5vlm-staged-train",
+      "root": "/tmp/rl-gspo-report-smoke/RL_GSPO_Qwen2.5VLM/outputs_staged",
+      "phases": [
+        "phase_a",
+        "phase_b",
+        "phase_c",
+        "phase_d"
+      ],
+      "exists": true
+    },
+    {
+      "run_family": "large_split_continue",
+      "notebook_slug": "mcgmcg1/rl-gspo-qwen2-5vlm-large-split-continue",
+      "root": "/tmp/rl-gspo-qwen2-5vlm-large-full/RL_GSPO_Qwen2.5VLM/outputs_staged_large_continue",
+      "phases": [
+        "phase_c",
+        "phase_d"
+      ],
+      "exists": true
+    },
+    {
+      "run_family": "phase_d_dedicated",
+      "notebook_slug": "mcgmcg1/rl-gspo-qwen2-5vlm-phase-d-large-continue",
+      "root": "/tmp/rl-gspo-qwen2-5vlm-phase-d-final/RL_GSPO_Qwen2.5VLM/outputs_staged_phase_d_from_large_phase_c",
+      "phases": [
+        "phase_d"
+      ],
+      "exists": true
+    }
+  ],
+  "notes": [
+    "Smoke, larger-split, and dedicated Phase D bundles are present locally and were used directly for table and plot generation.",
+    "The larger-split Phase C best composite checkpoint is the recommended final checkpoint in the generated summary outputs."
+  ]
+}

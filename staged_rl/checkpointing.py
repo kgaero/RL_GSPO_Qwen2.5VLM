@@ -20,6 +20,7 @@ class ResumePlan:
 
     model_load_path: Optional[str]
     trainer_resume_path: Optional[str]
+    adapter_warm_start_path: Optional[str]
     selector: Optional[str]
     phase_name: Optional[str]
 
@@ -244,6 +245,7 @@ def build_resume_plan(
     current_phase_dir: Path,
     search_dirs: Sequence[Path],
     default_model_name: str,
+    force_warm_start: bool = False,
 ) -> ResumePlan:
     """Resolve whether a selector should be treated as warm-start or trainer resume."""
 
@@ -252,23 +254,26 @@ def build_resume_plan(
         return ResumePlan(
             model_load_path=default_model_name,
             trainer_resume_path=None,
+            adapter_warm_start_path=None,
             selector=selector,
             phase_name=None,
         )
 
     checkpoint_path = str(resolved["checkpoint_path"])
     checkpoint_phase = resolved.get("phase_name")
-    if selector == "latest" or (checkpoint_phase is not None and checkpoint_phase == current_phase):
+    if not force_warm_start and (selector == "latest" or (checkpoint_phase is not None and checkpoint_phase == current_phase)):
         return ResumePlan(
             model_load_path=default_model_name,
             trainer_resume_path=checkpoint_path,
+            adapter_warm_start_path=None,
             selector=selector,
             phase_name=checkpoint_phase,
         )
 
     return ResumePlan(
-        model_load_path=checkpoint_path,
+        model_load_path=default_model_name,
         trainer_resume_path=None,
+        adapter_warm_start_path=checkpoint_path,
         selector=selector,
         phase_name=checkpoint_phase,
     )

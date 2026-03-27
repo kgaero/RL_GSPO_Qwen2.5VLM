@@ -11,7 +11,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from staged_rl.config import apply_hardware_profile, build_default_hardware_profiles, build_default_run_config
 from staged_rl.data import analyze_dataset_records, dataset_to_records, load_mathvista_split, save_dataset_analysis
-from staged_rl.diagnostics import save_json
+from staged_rl.diagnostics import save_json, write_fatal_error
 
 
 LOGGER = logging.getLogger(__name__)
@@ -35,6 +35,11 @@ def parse_args() -> argparse.Namespace:
         "--resume",
         default=None,
         help="Checkpoint selector: latest, best_structure, best_correctness, best_composite, checkpoint-* name, or path.",
+    )
+    parser.add_argument(
+        "--warm-start-checkpoint",
+        default=None,
+        help="Explicit checkpoint path or selector to load adapter weights from without restoring trainer state.",
     )
     parser.add_argument("--output-root", default=None, help="Override the default output root.")
     parser.add_argument("--train-split", default=None, help="Override the training split name.")
@@ -130,11 +135,15 @@ def main() -> None:
     run_config = apply_cli_overrides(build_default_run_config(phase_name=args.phase), args)
     output_dir = run_config.output_dir_for_phase(run_config.phase_name)
     output_dir.mkdir(parents=True, exist_ok=True)
+    fatal_error_path = output_dir / "fatal_error.txt"
+    if fatal_error_path.exists():
+        fatal_error_path.unlink()
 
     save_json(
         {
             "phase": run_config.phase_name,
             "resume": args.resume,
+            "warm_start_checkpoint": args.warm_start_checkpoint,
             "dataset_analysis_only": args.dataset_analysis_only,
             "output_root": run_config.output_root,
             "train_split": run_config.train_split,
@@ -147,12 +156,38 @@ def main() -> None:
         output_dir / "run_request.json",
     )
 
-    if args.dataset_analysis_only:
-        results = dataset_analysis_only(run_config)
-    else:
-        from staged_rl.trainer_runtime import run_phase
+    try:
+        if args.dataset_analysis_only:
+            results = dataset_analysis_only(run_config)
+        else:
+            from staged_rl.trainer_runtime import run_phase
 
-        results = run_phase(run_config, phase_name=args.phase, resume_selector=args.resume)
+            results = run_phase(
+                run_config,
+                phase_name=args.phase,
+                resume_selector=args.resume,
+                warm_start_selector=args.warm_start_checkpoint,
+            )
+    except Exception as exc:
+        write_fatal_error(
+            fatal_error_path,
+            exc,
+            {
+                "phase": run_config.phase_name,
+                "resume": args.resume,
+                "warm_start_checkpoint": args.warm_start_checkpoint,
+                "dataset_analysis_only": args.dataset_analysis_only,
+                "output_root": run_config.output_root,
+                "train_split": run_config.train_split,
+                "eval_split": run_config.eval_split,
+                "hardware_profile": run_config.hardware_profile_name,
+                "disabled_stages": args.disable_stage,
+                "enabled_stages": args.enable_stage,
+                "enable_multichoice_training": args.enable_multichoice_training,
+            },
+        )
+        LOGGER.exception("Fatal run error written to %s", fatal_error_path)
+        raise
 
     print("=" * 80)
     print("STAGED RL RUN COMPLETE")

@@ -20,7 +20,15 @@ rsync -av \
   --exclude '*.pth' \
   --exclude '*.ckpt' \
   --exclude '*.onnx' \
+  --exclude 'error.txt' \
   --exclude 'RL Qwen Model Analysis.docx' \
   "$REPO_DIR/" "$OUT_DIR/"
+
+for folder_name in staged_rl tests; do
+  if [[ -d "$OUT_DIR/$folder_name" ]]; then
+    tar -cf "$OUT_DIR/${folder_name}.tar" -C "$OUT_DIR" "$folder_name"
+    rm -rf "$OUT_DIR/$folder_name"
+  fi
+done
 
 echo "Prepared Kaggle upload directory: $OUT_DIR"

@@ -7,6 +7,27 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .ipynb_checkpoints/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+coverage.xml
+nosetests.xml
+junit.xml
+
+# Python packaging/build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env/
 
 # OS-specific noise
 .DS_Store
@@ -21,6 +42,9 @@ grpo_trainer_lora_model/
 grpo_eval_outputs/
 unsloth_compiled_cache/
 
+# Local experiment outputs
+.venv-results/
+
 # Large model/checkpoint artifacts
 *.safetensors
 *.pt
@@ -30,3 +54,7 @@ unsloth_compiled_cache/
 
 # Local analysis export
 RL Qwen Model Analysis.docx
+
+# IDE/editor settings
+.idea/
+.vscode/

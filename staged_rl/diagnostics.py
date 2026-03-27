@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import json
+import traceback
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Mapping
@@ -83,3 +85,23 @@ def save_json(data: Mapping[str, Any], output_path: Path) -> None:
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def write_fatal_error(output_path: Path, exc: BaseException, context: Mapping[str, Any]) -> None:
+    """Persist a fatal exception with traceback and run context."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = dt.datetime.now(dt.timezone.utc).isoformat()
+    trace = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    payload = [
+        f"timestamp_utc: {timestamp}",
+        f"exception_type: {type(exc).__name__}",
+        f"exception_message: {exc}",
+        "",
+        "context:",
+        json.dumps(dict(context), indent=2, ensure_ascii=False, default=str),
+        "",
+        "traceback:",
+        trace,
+    ]
+    output_path.write_text("\n".join(payload), encoding="utf-8")

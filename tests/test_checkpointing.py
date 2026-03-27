@@ -56,6 +56,7 @@ class CheckpointingTests(unittest.TestCase):
                     },
                 }
             )
+            (run_dir / "checkpoint-20").mkdir(parents=True, exist_ok=True)
 
             plan = build_resume_plan(
                 selector="best_composite",
@@ -64,8 +65,9 @@ class CheckpointingTests(unittest.TestCase):
                 search_dirs=[run_dir],
                 default_model_name="base-model",
             )
-            self.assertEqual(plan.model_load_path, str(run_dir / "checkpoint-20"))
+            self.assertEqual(plan.model_load_path, "base-model")
             self.assertIsNone(plan.trainer_resume_path)
+            self.assertEqual(plan.adapter_warm_start_path, str(run_dir / "checkpoint-20"))
 
             latest_plan = build_resume_plan(
                 selector="latest",
@@ -75,8 +77,20 @@ class CheckpointingTests(unittest.TestCase):
                 default_model_name="base-model",
             )
             self.assertEqual(latest_plan.trainer_resume_path, str(run_dir / "checkpoint-20"))
+            self.assertIsNone(latest_plan.adapter_warm_start_path)
+
+            warm_start_plan = build_resume_plan(
+                selector=str(run_dir / "checkpoint-20"),
+                current_phase="phase_a",
+                current_phase_dir=run_dir,
+                search_dirs=[run_dir],
+                default_model_name="base-model",
+                force_warm_start=True,
+            )
+            self.assertEqual(warm_start_plan.model_load_path, "base-model")
+            self.assertIsNone(warm_start_plan.trainer_resume_path)
+            self.assertEqual(warm_start_plan.adapter_warm_start_path, str(run_dir / "checkpoint-20"))
 
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -167,10 +167,13 @@ class ModelConfig:
 
     base_model_name: str = "unsloth/Qwen2.5-VL-7B-Instruct"
     max_seq_length: int = 16384
+    image_size: int = 512
     load_in_4bit: bool = True
     fast_inference: bool = True
+    fast_inference_kwargs: dict[str, Any] = field(default_factory=dict)
     gpu_memory_utilization: float = 0.8
     lora_rank: int = 16
+    max_lora_rank: Optional[int] = None
     lora_alpha: int = 16
     finetune_vision_layers: bool = False
     finetune_language_layers: bool = True
@@ -438,23 +441,31 @@ def build_default_hardware_profiles() -> dict[str, HardwareProfileSpec]:
             name="kaggle_t4",
             description="Conservative single-GPU Kaggle T4 profile with shorter completions and lighter eval.",
             model_overrides={
-                "max_seq_length": 4096,
-                "gpu_memory_utilization": 0.55,
+                "max_seq_length": 1280,
+                "image_size": 336,
+                "gpu_memory_utilization": 0.65,
                 "lora_rank": 8,
+                "max_lora_rank": 8,
                 "lora_alpha": 8,
+                "fast_inference_kwargs": {
+                    "compilation_config": {
+                        "level": 3,
+                        "cudagraph_mode": "PIECEWISE",
+                    },
+                },
             },
             trainer_overrides={
                 "gradient_accumulation_steps": 4,
                 "num_generations": 2,
-                "max_prompt_length": 896,
-                "max_completion_length": 160,
+                "max_prompt_length": 320,
+                "max_completion_length": 64,
             },
             eval_overrides={
-                "num_samples_per_prompt": 2,
-                "max_eval_examples_per_subset": 8,
+                "num_samples_per_prompt": 1,
+                "max_eval_examples_per_subset": 2,
             },
             phase_trainer_overrides={
-                "phase_d": {"max_completion_length": 224},
+                "phase_d": {"max_completion_length": 96},
             },
         ),
     }

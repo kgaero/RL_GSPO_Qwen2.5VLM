@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Mapping, Optional
 
 import torch
@@ -26,6 +28,59 @@ from .rewarding import RewardRuntimeContext, build_reward_functions
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _install_trl_prepare_peft_workaround(trl_model_utils: Any) -> bool:
+    """Patch TRL's prepare_peft_model dataclass replacement bug for GRPO configs.
+
+    TRL versions affected by issue #3980 call `dataclasses.replace(args, gradient_checkpointing=False)`
+    inside `prepare_peft_model`. GRPOConfig may already have both `generation_batch_size` and
+    `steps_per_generation` populated by the time that replacement happens, which causes a second
+    validation failure during reconstruction. Upstream fixed this by mutating `args.gradient_checkpointing`
+    in place instead of reconstructing the dataclass. We mirror that behavior locally.
+    """
+
+    if getattr(trl_model_utils, "_staged_rl_prepare_peft_workaround_installed", False):
+        return False
+
+    dataclasses_module = getattr(trl_model_utils, "dataclasses", None)
+    replace_func = getattr(dataclasses_module, "replace", None)
+    if replace_func is None:
+        return False
+
+    @functools.wraps(replace_func)
+    def safe_replace(obj, /, **changes):
+        if (
+            changes == {"gradient_checkpointing": False}
+            and hasattr(obj, "generation_batch_size")
+            and hasattr(obj, "steps_per_generation")
+            and getattr(obj, "generation_batch_size", None) is not None
+            and getattr(obj, "steps_per_generation", None) is not None
+        ):
+            setattr(obj, "gradient_checkpointing", False)
+            return obj
+        return replace_func(obj, **changes)
+
+    proxy = SimpleNamespace(**{name: getattr(dataclasses_module, name) for name in dir(dataclasses_module)})
+    proxy.replace = safe_replace
+    trl_model_utils.dataclasses = proxy
+    trl_model_utils._staged_rl_prepare_peft_workaround_installed = True
+    return True
+
+
+def patch_trl_prepare_peft_workaround() -> None:
+    """Install the GRPO PEFT workaround when running against older TRL builds."""
+
+    try:
+        from trl.models import utils as trl_model_utils  # pylint: disable=import-error
+    except ImportError:
+        return
+
+    if _install_trl_prepare_peft_workaround(trl_model_utils):
+        LOGGER.info(
+            "Installed TRL GRPO PEFT workaround: avoid dataclasses.replace(args, gradient_checkpointing=False) "
+            "for configs that already materialize both generation_batch_size and steps_per_generation."
+        )
 
 
 def log_cuda_environment() -> None:
@@ -79,22 +134,173 @@ def apply_reward_weights(trainer, reward_funcs, reward_weights: Mapping[str, flo
     )
 
 
-def create_model_and_tokenizer(run_config: RunConfig, model_name_or_path: Optional[str] = None):
+def _count_trainable_parameters(model: Any) -> tuple[int, int]:
+    """Return trainable and total parameter counts when available."""
+
+    if not hasattr(model, "parameters"):
+        return 0, 0
+    trainable = 0
+    total = 0
+    for param in model.parameters():
+        numel = int(param.numel()) if hasattr(param, "numel") else 0
+        total += numel
+        if getattr(param, "requires_grad", False):
+            trainable += numel
+    return trainable, total
+
+
+def _has_active_peft_adapters(model: Any) -> bool:
+    """Return whether the model already has live PEFT adapters attached."""
+
+    peft_config = getattr(model, "peft_config", None)
+    if isinstance(peft_config, Mapping):
+        return bool(peft_config)
+    return peft_config is not None
+
+
+def _configure_generation_cache_behavior(model: Any) -> dict[str, Any]:
+    """Clear static-cache settings on wrapped models before GRPO generation.
+
+    Qwen2.5-VL under Unsloth/Transformers can fail inside cache update paths when
+    generation uses a statically prepared cache. We explicitly reset cache-related
+    generation config on the PEFT wrapper and nested base models so GRPO uses the
+    default dynamic cache path instead.
+    """
+
+    patched = []
+    visited: set[int] = set()
+    pending = [model]
+
+    while pending:
+        current = pending.pop(0)
+        if current is None or id(current) in visited:
+            continue
+        visited.add(id(current))
+
+        generation_config = getattr(current, "generation_config", None)
+        if generation_config is not None:
+            if hasattr(generation_config, "cache_implementation"):
+                generation_config.cache_implementation = None
+            if hasattr(generation_config, "use_cache"):
+                generation_config.use_cache = True
+            patched.append(type(current).__name__)
+
+        config = getattr(current, "config", None)
+        if config is not None:
+            if hasattr(config, "cache_implementation"):
+                config.cache_implementation = None
+            if hasattr(config, "use_cache"):
+                config.use_cache = True
+
+        for attr_name in ("base_model", "model", "language_model"):
+            nested = getattr(current, attr_name, None)
+            if nested is not None:
+                pending.append(nested)
+
+    root_generation_config = getattr(model, "generation_config", None)
+    return {
+        "patched_wrappers": patched,
+        "cache_implementation": getattr(root_generation_config, "cache_implementation", None),
+        "use_cache": getattr(root_generation_config, "use_cache", None),
+    }
+
+
+def _warm_start_peft_adapter(model: Any, adapter_path: Optional[str]) -> None:
+    """Load checkpoint LoRA weights into the active Unsloth PEFT wrapper.
+
+    Cross-phase continuation must keep the model object returned by
+    `FastVisionModel.get_peft_model(...)` so Unsloth's GRPO hooks still expose
+    methods like `load_lora(...)` for vLLM generation. Loading a checkpoint
+    directly through `from_pretrained(checkpoint_path)` returns a plain PEFT
+    wrapper and loses that method. We instead attach a fresh adapter to the base
+    model, then warm-start its weights from the selected checkpoint.
+    """
+
+    if not adapter_path:
+        return
+
+    checkpoint_dir = Path(adapter_path)
+    if not checkpoint_dir.exists():
+        raise FileNotFoundError(f"Warm-start adapter path does not exist: {checkpoint_dir}")
+
+    errors: list[str] = []
+
+    try:
+        from peft.utils.save_and_load import load_peft_weights, set_peft_model_state_dict  # pylint: disable=import-error
+
+        adapter_state = load_peft_weights(str(checkpoint_dir), device="cpu")
+        load_result = set_peft_model_state_dict(
+            model,
+            adapter_state,
+            adapter_name="default",
+            ignore_mismatched_sizes=False,
+        )
+        if hasattr(model, "set_adapter"):
+            model.set_adapter("default")
+        LOGGER.info(
+            "Warm-started adapter from %s using PEFT state-dict load. Result=%s",
+            checkpoint_dir,
+            load_result,
+        )
+        return
+    except Exception as exc:  # pragma: no cover - exercised in Kaggle runtime
+        errors.append(f"peft_state_dict_load_failed={exc!r}")
+        LOGGER.warning("PEFT state-dict warm start failed for %s: %s", checkpoint_dir, exc)
+
+    if hasattr(model, "load_adapter"):
+        try:
+            if hasattr(model, "delete_adapter"):
+                try:
+                    model.delete_adapter("default")
+                except Exception:  # pragma: no cover - best-effort cleanup
+                    pass
+            model.load_adapter(str(checkpoint_dir), adapter_name="default", is_trainable=True)
+            if hasattr(model, "set_adapter"):
+                model.set_adapter("default")
+            LOGGER.info("Warm-started adapter from %s using model.load_adapter(...).", checkpoint_dir)
+            return
+        except Exception as exc:  # pragma: no cover - exercised in Kaggle runtime
+            errors.append(f"model_load_adapter_failed={exc!r}")
+            LOGGER.warning("Adapter warm start via load_adapter failed for %s: %s", checkpoint_dir, exc)
+
+    raise RuntimeError(
+        "Unable to warm-start LoRA adapter while preserving Unsloth runtime methods. "
+        f"Checkpoint={checkpoint_dir}. Errors: {'; '.join(errors) or 'none recorded'}"
+    )
+
+
+def create_model_and_tokenizer(
+    run_config: RunConfig,
+    model_name_or_path: Optional[str] = None,
+    adapter_warm_start_path: Optional[str] = None,
+):
     """Load the model and tokenizer, then attach LoRA if needed."""
 
     from unsloth import FastVisionModel  # pylint: disable=import-error
 
     model_config = run_config.model
     resolved_name = model_name_or_path or model_config.base_model_name
+    max_lora_rank = model_config.max_lora_rank or model_config.lora_rank
+    LOGGER.info(
+        "Loading model %s with max_seq_length=%s, fast_inference=%s, gpu_memory_utilization=%s, max_lora_rank=%s, fast_inference_kwargs=%s",
+        resolved_name,
+        model_config.max_seq_length,
+        model_config.fast_inference,
+        model_config.gpu_memory_utilization,
+        max_lora_rank,
+        model_config.fast_inference_kwargs,
+    )
     model, tokenizer = FastVisionModel.from_pretrained(
         model_name=resolved_name,
         max_seq_length=model_config.max_seq_length,
         load_in_4bit=model_config.load_in_4bit,
         fast_inference=model_config.fast_inference,
         gpu_memory_utilization=model_config.gpu_memory_utilization,
+        max_lora_rank=max_lora_rank,
+        **model_config.fast_inference_kwargs,
     )
 
-    if not hasattr(model, "peft_config"):
+    if not _has_active_peft_adapters(model):
         model = FastVisionModel.get_peft_model(
             model,
             finetune_vision_layers=model_config.finetune_vision_layers,
@@ -108,6 +314,16 @@ def create_model_and_tokenizer(run_config: RunConfig, model_name_or_path: Option
             use_rslora=model_config.use_rslora,
             loftq_config=model_config.loftq_config,
             use_gradient_checkpointing=model_config.use_gradient_checkpointing,
+        )
+    _warm_start_peft_adapter(model, adapter_warm_start_path)
+    generation_runtime = _configure_generation_cache_behavior(model)
+    LOGGER.info("Generation cache runtime after model prep: %s", generation_runtime)
+    trainable_params, total_params = _count_trainable_parameters(model)
+    LOGGER.info("Model parameter counts after PEFT prep: trainable=%s total=%s", trainable_params, total_params)
+    if total_params > 0 and trainable_params == 0:
+        raise RuntimeError(
+            "Model has zero trainable parameters after PEFT preparation. "
+            "LoRA adapters were not attached correctly."
         )
     return model, tokenizer
 
@@ -236,11 +452,21 @@ def _load_controller_state_from_checkpoint(checkpoint_path: Optional[str], curre
     return json.loads(state_path.read_text(encoding="utf-8"))
 
 
-def run_phase(run_config: RunConfig, phase_name: Optional[str] = None, resume_selector: Optional[str] = None) -> dict[str, Any]:
+def run_phase(
+    run_config: RunConfig,
+    phase_name: Optional[str] = None,
+    resume_selector: Optional[str] = None,
+    warm_start_selector: Optional[str] = None,
+) -> dict[str, Any]:
     """Run one explicit phase of staged RL training."""
 
+    try:
+        import unsloth  # pylint: disable=unused-import,import-error
+    except ImportError:
+        pass
     from trl import GRPOTrainer  # pylint: disable=import-error
 
+    patch_trl_prepare_peft_workaround()
     log_cuda_environment()
 
     resolved_phase = phase_name or run_config.phase_name
@@ -250,16 +476,23 @@ def run_phase(run_config: RunConfig, phase_name: Optional[str] = None, resume_se
     save_json(dataclass_to_dict(run_config), output_dir / "run_config.json")
 
     search_dirs = [run_config.output_dir_for_phase(name) for name in run_config.phases]
-    selector = resume_selector if resume_selector is not None else phase_config.default_resume.selector
+    selector = warm_start_selector if warm_start_selector is not None else resume_selector
+    if selector is None:
+        selector = phase_config.default_resume.selector
     resume_plan = build_resume_plan(
         selector=selector,
         current_phase=resolved_phase,
         current_phase_dir=output_dir,
         search_dirs=search_dirs,
         default_model_name=run_config.model.base_model_name,
+        force_warm_start=warm_start_selector is not None,
     )
 
-    model, tokenizer = create_model_and_tokenizer(run_config, model_name_or_path=resume_plan.model_load_path)
+    model, tokenizer = create_model_and_tokenizer(
+        run_config,
+        model_name_or_path=resume_plan.model_load_path,
+        adapter_warm_start_path=resume_plan.adapter_warm_start_path,
+    )
     train_base = load_mathvista_split(run_config, run_config.train_split)
     eval_base = load_mathvista_split(run_config, run_config.eval_split)
 
@@ -272,7 +505,13 @@ def run_phase(run_config: RunConfig, phase_name: Optional[str] = None, resume_se
         output_dir / "dataset_analysis_eval.json",
     )
 
-    train_dataset, stage_datasets = build_phase_train_dataset(train_base, phase_config, run_config.stages, tokenizer)
+    train_dataset, stage_datasets = build_phase_train_dataset(
+        train_base,
+        phase_config,
+        run_config.stages,
+        tokenizer,
+        image_size=run_config.model.image_size,
+    )
     eval_datasets = build_eval_datasets(eval_base, run_config, tokenizer)
 
     reward_runtime = RewardRuntimeContext(
