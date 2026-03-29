@@ -10,10 +10,15 @@ Recommended final checkpoint:
 
 Generated tables:
 - `tables/master_table_milestones.csv`
+- `tables/master_table_milestones.md`
 - `tables/master_table_all_checkpoints.csv`
+- `tables/master_table_all_checkpoints.md`
 - `tables/resource_runtime_tuning.csv`
+- `tables/resource_runtime_tuning.md`
 - `tables/resource_knob_tradeoffs.csv`
+- `tables/resource_knob_tradeoffs.md`
 - `tables/runtime_stabilization_timeline.csv`
+- `tables/runtime_stabilization_timeline.md`
 
 Generated plots:
 - `plots/evolution_panels.png`

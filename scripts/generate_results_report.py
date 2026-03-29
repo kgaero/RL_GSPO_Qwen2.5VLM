@@ -216,6 +216,299 @@ CHECKPOINT_ONLY_COLUMNS = MASTER_TABLE_COLUMNS + [
     "Is Latest",
 ]
 
+MASTER_COLUMN_GROUPS = [
+    (
+        "Identity and Selection",
+        [
+            "Milestone ID",
+            "Run Family",
+            "Run Family Label",
+            "Notebook / Run Slug",
+            "Output Root",
+            "Phase",
+            "Phase Label",
+            "Checkpoint",
+            "Global Step",
+            "Timeline Order",
+            "X Label",
+            "Artifact Status",
+            "Metrics Source Kind",
+            "Alias Role",
+            "Alias Roles",
+            "Keep / Discard",
+            "Decision Reason",
+            "Key Interpretation",
+        ],
+    ),
+    (
+        "Training Setup",
+        [
+            "Train Split",
+            "Eval Split",
+            "Hardware Profile",
+            "Seed / Resume Source",
+            "Warm-Start Checkpoint",
+            "Training Strategy Introduced",
+            "Stage Mix / Curriculum",
+            "Phase Description",
+            "Phase Default Resume Selector",
+            "Base Model",
+            "4-bit Enabled",
+            "Fast Inference Enabled",
+            "Fast Inference Mode",
+            "Compilation Mode",
+            "max_seq_length",
+            "image_size",
+            "LoRA Rank",
+            "Max LoRA Rank",
+            "gradient_accumulation_steps",
+            "gpu_memory_utilization",
+            "num_generations",
+            "max_prompt_length",
+            "max_completion_length",
+            "max_eval_examples_per_subset",
+        ],
+    ),
+    (
+        "Reward Configuration",
+        [
+            "Configured Initial Correctness Weight",
+            "Configured Initial Formatting Weight",
+            "Configured Initial Parseability Weight",
+            "Configured Initial Finished Weight",
+            "Configured Initial Tolerance Weight",
+            "Configured Initial Brevity Weight",
+            "Correctness Weight",
+            "Formatting Weight",
+            "Parseability Weight",
+            "Finished Weight",
+            "Tolerance Weight",
+            "Brevity Weight",
+            "Correctness Reward Mean",
+            "Format Reward Mean",
+            "Parseable Reward Mean",
+            "Finished Reward Mean",
+            "Tolerance Reward Mean",
+        ],
+    ),
+    (
+        "Evaluation Metrics",
+        [
+            "Exact Match",
+            "Tolerance Accuracy",
+            "Best-of-k Accuracy",
+            "Best-of-k Tolerance Accuracy",
+            "Sample-Level Exact Match",
+            "Sample-Level Tolerance Accuracy",
+            "Parseable Rate",
+            "Reasoning Tag Compliance",
+            "Solution Tag Compliance",
+            "Well-Formed Rate",
+            "Malformed Rate",
+            "Completion Success Rate",
+            "Truncation Rate",
+            "Average Completion Tokens",
+            "Repetition Rate",
+            "Sample Diversity",
+            "Average Total Reward",
+            "Structure Score",
+            "Correctness Score",
+            "Composite Score",
+            "KL Mean",
+            "KL P95",
+        ],
+    ),
+    (
+        "Checkpoint Selection Diagnostics",
+        [
+            "Checkpoint Rank Within Phase",
+            "Is Best Composite",
+            "Is Best Correctness",
+            "Is Best Structure",
+            "Is Latest",
+            "Controller History Length",
+            "Delta Exact vs Previous Milestone",
+            "Delta Composite vs Previous Milestone",
+        ],
+    ),
+    (
+        "Evidence Paths",
+        [
+            "Checkpoint Path",
+            "Checkpoint Path Abs",
+            "Evidence Root",
+            "Metrics Source Path",
+            "Checkpoint Info Path",
+            "Reward Weights Path",
+            "Controller State Path",
+            "Run Config Path",
+            "Run Request Path",
+            "Diagnostics Path",
+            "Train Log Summary Path",
+            "Summary Path",
+            "Notes",
+        ],
+    ),
+]
+
+MASTER_COLUMN_DESCRIPTIONS = {
+    "Milestone ID": "Stable short name used to refer to a key row in the report.",
+    "Run Family": "Internal run bucket showing which notebook family produced the row.",
+    "Run Family Label": "Human-friendly label for the run family.",
+    "Notebook / Run Slug": "Kaggle or local run identifier that produced the artifacts.",
+    "Output Root": "Top-level output folder where this run wrote checkpoints and reports.",
+    "Phase": "Training phase name used by the staged RL pipeline.",
+    "Phase Label": "Human-friendly phase name used in tables and plots.",
+    "Checkpoint": "Checkpoint directory name.",
+    "Global Step": "Trainer step number at which the checkpoint was saved.",
+    "Timeline Order": "Chronological order used in the report figures.",
+    "X Label": "Short checkpoint label shown on the x-axis of plots.",
+    "Artifact Status": "Whether this row came from a real checkpoint, alias metadata, or a baseline snapshot.",
+    "Metrics Source Kind": "Which file type supplied the metrics for the row.",
+    "Alias Role": "Primary alias assigned to the checkpoint, such as best composite or latest.",
+    "Alias Roles": "All alias labels that point to the checkpoint.",
+    "Keep / Discard": "Report-level recommendation for whether to keep this checkpoint for future use.",
+    "Decision Reason": "Short explanation for the keep/discard recommendation.",
+    "Key Interpretation": "Plain-language take on what the row means.",
+    "Train Split": "Dataset split used for training in this run.",
+    "Eval Split": "Dataset split used for checkpoint evaluation.",
+    "Hardware Profile": "Named runtime profile applied to fit the hardware budget.",
+    "Seed / Resume Source": "Resume selector used to continue from a previous checkpoint alias.",
+    "Warm-Start Checkpoint": "Explicit checkpoint path loaded before training started.",
+    "Training Strategy Introduced": "Short summary of what this phase was trying to teach the model.",
+    "Stage Mix / Curriculum": "Curriculum subset mix used in the phase.",
+    "Phase Description": "Longer phase description from the run config.",
+    "Phase Default Resume Selector": "Default alias that this phase expects to resume from.",
+    "Base Model": "Base pretrained model used before LoRA adaptation.",
+    "4-bit Enabled": "Whether 4-bit loading was used to reduce memory.",
+    "Fast Inference Enabled": "Whether the fast generation path was enabled during RL.",
+    "Fast Inference Mode": "Short name for the inference backend or mode.",
+    "Compilation Mode": "vLLM/Unsloth compilation setting used for stable generation.",
+    "max_seq_length": "Maximum total sequence length allowed by the runtime profile.",
+    "image_size": "Target image resolution used for visual inputs.",
+    "LoRA Rank": "Adapter rank used for LoRA fine-tuning.",
+    "Max LoRA Rank": "Upper LoRA rank bound passed to the runtime when supported.",
+    "gradient_accumulation_steps": "How many micro-batches were accumulated before an optimizer step.",
+    "gpu_memory_utilization": "Target GPU memory fraction reserved for the fast generation backend.",
+    "num_generations": "How many completions were sampled per prompt during RL.",
+    "max_prompt_length": "Maximum prompt token budget.",
+    "max_completion_length": "Maximum completion token budget.",
+    "max_eval_examples_per_subset": "Maximum checkpoint-eval examples per subset for that run.",
+    "Configured Initial Correctness Weight": "Starting correctness reward weight from the phase config.",
+    "Configured Initial Formatting Weight": "Starting formatting reward weight from the phase config.",
+    "Configured Initial Parseability Weight": "Starting parseability reward weight from the phase config.",
+    "Configured Initial Finished Weight": "Starting finished-answer reward weight from the phase config.",
+    "Configured Initial Tolerance Weight": "Starting tolerance reward weight from the phase config.",
+    "Configured Initial Brevity Weight": "Starting brevity reward weight from the phase config.",
+    "Correctness Weight": "Effective correctness reward weight saved with the checkpoint.",
+    "Formatting Weight": "Effective formatting reward weight saved with the checkpoint.",
+    "Parseability Weight": "Effective parseability reward weight saved with the checkpoint.",
+    "Finished Weight": "Effective completion-finished reward weight saved with the checkpoint.",
+    "Tolerance Weight": "Effective tolerance reward weight saved with the checkpoint.",
+    "Brevity Weight": "Effective brevity reward weight saved with the checkpoint.",
+    "Correctness Reward Mean": "Mean correctness reward observed during eval for this checkpoint.",
+    "Format Reward Mean": "Mean formatting reward observed during eval for this checkpoint.",
+    "Parseable Reward Mean": "Mean parseability reward observed during eval for this checkpoint.",
+    "Finished Reward Mean": "Mean finished-answer reward observed during eval for this checkpoint.",
+    "Tolerance Reward Mean": "Mean tolerance reward observed during eval for this checkpoint.",
+    "Exact Match": "Fraction of prompts whose final answer matched exactly.",
+    "Tolerance Accuracy": "Fraction of prompts counted correct under numeric tolerance.",
+    "Best-of-k Accuracy": "Best completion accuracy across the sampled completions per prompt.",
+    "Best-of-k Tolerance Accuracy": "Best completion tolerance accuracy across sampled completions.",
+    "Sample-Level Exact Match": "Exact-match rate measured at the sampled-completion level rather than prompt level.",
+    "Sample-Level Tolerance Accuracy": "Tolerance accuracy measured at the sampled-completion level.",
+    "Parseable Rate": "Fraction of outputs whose answer could be parsed successfully.",
+    "Reasoning Tag Compliance": "Fraction of outputs that included the required reasoning tags correctly.",
+    "Solution Tag Compliance": "Fraction of outputs that included the required solution tags correctly.",
+    "Well-Formed Rate": "Positive-form version of malformed rate: higher means fewer malformed outputs.",
+    "Malformed Rate": "Fraction of outputs with malformed structure or tags.",
+    "Completion Success Rate": "Positive-form version of truncation rate: higher means fewer truncated outputs.",
+    "Truncation Rate": "Fraction of outputs that ended before producing a usable final answer.",
+    "Average Completion Tokens": "Mean output length in completion tokens.",
+    "Repetition Rate": "Simple repetition score; higher means the model repeated itself more.",
+    "Sample Diversity": "How varied the sampled answers were across multiple generations.",
+    "Average Total Reward": "Mean total reward for the evaluated completions.",
+    "Structure Score": "Composite structure-oriented checkpoint score used in selection.",
+    "Correctness Score": "Composite correctness-oriented checkpoint score used in selection.",
+    "Composite Score": "Main combined checkpoint score used for best-composite selection.",
+    "KL Mean": "Mean KL divergence logged during training for that phase.",
+    "KL P95": "95th percentile KL divergence logged during training for that phase.",
+    "Checkpoint Rank Within Phase": "Checkpoint order within its phase after sorting by global step.",
+    "Is Best Composite": "Whether the checkpoint is tagged as best composite for its phase.",
+    "Is Best Correctness": "Whether the checkpoint is tagged as best correctness for its phase.",
+    "Is Best Structure": "Whether the checkpoint is tagged as best structure for its phase.",
+    "Is Latest": "Whether the checkpoint is tagged as the latest saved checkpoint for its phase.",
+    "Controller History Length": "How many eval events were stored in the reward-controller history.",
+    "Delta Exact vs Previous Milestone": "Change in exact match compared with the previous milestone row.",
+    "Delta Composite vs Previous Milestone": "Change in composite score compared with the previous milestone row.",
+    "Checkpoint Path": "Relative checkpoint path recorded in the saved artifacts.",
+    "Checkpoint Path Abs": "Absolute local filesystem path to the checkpoint directory or source file.",
+    "Evidence Root": "Root folder containing the evidence for the row.",
+    "Metrics Source Path": "File path that directly supplied the row metrics.",
+    "Checkpoint Info Path": "Path to the saved checkpoint metadata JSON.",
+    "Reward Weights Path": "Path to the saved effective reward weights JSON.",
+    "Controller State Path": "Path to the saved reward-controller state JSON.",
+    "Run Config Path": "Path to the saved run configuration JSON.",
+    "Run Request Path": "Path to the saved CLI request JSON for the run.",
+    "Diagnostics Path": "Path to the saved post-training diagnostics JSON for the phase.",
+    "Train Log Summary Path": "Path to the saved training-log summary JSON for the phase.",
+    "Summary Path": "Path to the short human-readable checkpoint summary file.",
+    "Notes": "Extra caveats or context that did not fit cleanly into the other columns.",
+}
+
+RESOURCE_RUNTIME_COLUMN_DESCRIPTIONS = {
+    "Run Family": "Run family or reference profile represented by the row.",
+    "Notebook / Run Slug": "Notebook or run identifier tied to the row.",
+    "Hardware": "Hardware used, or reference hardware label for comparison rows.",
+    "Observed Constraint / Failure Mode": "Short statement of the memory or runtime constraint being addressed.",
+    "Train Split": "Training split used by that run.",
+    "Eval Split": "Evaluation split used by that run.",
+    "Hardware Profile": "Named runtime profile applied to the run.",
+    "Base Model": "Base pretrained model behind the run.",
+    "4-bit Enabled": "Whether 4-bit loading was enabled.",
+    "LoRA Rank": "LoRA rank used in that profile.",
+    "Max LoRA Rank": "Maximum LoRA rank setting if present.",
+    "max_seq_length": "Maximum sequence length allowed by the profile.",
+    "image_size": "Image resolution used in the profile.",
+    "num_generations": "Number of sampled completions per prompt during RL.",
+    "max_prompt_length": "Maximum prompt token budget.",
+    "max_completion_length": "Maximum completion token budget.",
+    "gradient_accumulation_steps": "Gradient accumulation count used during training.",
+    "gpu_memory_utilization": "Target vLLM/fast-generation memory reservation fraction.",
+    "fast_inference enabled": "Whether the fast generation path remained enabled.",
+    "vLLM version": "vLLM version if logged; otherwise not logged.",
+    "cudagraph / compilation mode": "Compilation mode used to keep fast generation stable.",
+    "Warm start used?": "Whether the run started from an earlier checkpoint rather than from scratch.",
+    "What knob changed": "Short summary of the main profile differences versus the reference profile.",
+    "Why this helps memory": "Plain-language reason the profile choices reduce memory pressure.",
+    "Tradeoff introduced": "What capability or convenience was sacrificed to stay within the VRAM budget.",
+    "Outcome": "What the row achieved under that profile.",
+}
+
+RESOURCE_KNOB_COLUMN_DESCRIPTIONS = {
+    "Knob": "The runtime or training setting that changed.",
+    "Default": "Reference value from the default higher-capacity profile.",
+    "Kaggle T4": "Value used in the stable Kaggle T4 profile.",
+    "Why it reduced memory pressure": "Simple reason this change lowered VRAM demand or stabilized runtime.",
+    "Tradeoff accepted": "What was sacrificed in exchange for the lower memory demand.",
+}
+
+TIMELINE_COLUMN_DESCRIPTIONS = {
+    "Timeline Order": "Chronological order used in the timeline figure and table.",
+    "Event Label": "Short label for the milestone event.",
+    "Milestone ID": "Stable internal milestone key.",
+    "Run Family": "Run family that produced the milestone.",
+    "Phase": "Training phase tied to the milestone.",
+    "Train Split": "Training split used at that milestone.",
+    "Eval Split": "Eval split used at that milestone.",
+    "Warm Start": "Resume alias or explicit warm-start checkpoint used before training.",
+    "Status": "Short status label describing what changed at that milestone.",
+    "Best Exact": "Best exact-match value represented by the milestone.",
+    "Best Composite": "Best composite score represented by the milestone.",
+    "Key Change": "Short description of what the training setup changed at that point.",
+    "Interpretation": "Plain-language read of why the milestone matters.",
+}
+
 
 def ensure_dirs() -> None:
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
@@ -824,6 +1117,55 @@ def write_csv(path: Path, rows: list[dict[str, Any]], columns: list[str]) -> Non
             writer.writerow(output)
 
 
+def render_column_glossary(groups: list[tuple[str, list[str]]], descriptions: dict[str, str]) -> str:
+    sections = []
+    for heading, columns in groups:
+        sections.append(f"### {heading}\n")
+        sections.append("| Column | Simple meaning |")
+        sections.append("| --- | --- |")
+        for column in columns:
+            sections.append(f"| `{column}` | {descriptions.get(column, column.replace('_', ' '))} |")
+        sections.append("")
+    return "\n".join(sections)
+
+
+def write_markdown_doc(
+    *,
+    markdown_path: Path,
+    title: str,
+    csv_name: str,
+    purpose: str,
+    glossary_markdown: str,
+    analysis_lines: list[str],
+) -> None:
+    lines = [
+        f"# {title}",
+        "",
+        f"CSV source: `{csv_name}`",
+        "",
+        "## Purpose",
+        "",
+        purpose,
+        "",
+        "## Column Glossary",
+        "",
+        glossary_markdown.rstrip(),
+        "",
+        "## Analysis",
+        "",
+    ]
+    for line in analysis_lines:
+        lines.append(f"- {line}")
+    lines.append("")
+    markdown_path.write_text("\n".join(lines))
+
+
+def format_float(value: Any) -> str:
+    if not isinstance(value, (int, float)):
+        return str(value)
+    return f"{value:.3f}".rstrip("0").rstrip(".")
+
+
 def checkpoint_rows_for_plot(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [row for row in rows if row["Artifact Status"] != "planned_milestone_missing"]
 
@@ -1269,6 +1611,96 @@ def build_runtime_timeline_rows(milestones: list[dict[str, Any]]) -> list[dict[s
     return rows
 
 
+def analysis_for_milestones(rows: list[dict[str, Any]]) -> list[str]:
+    lookup = {row["Milestone ID"]: row for row in rows}
+    baseline = lookup["baseline_local_snapshot"]
+    smoke_a = lookup["smoke_phase_a_best"]
+    smoke_b = lookup["smoke_phase_b_best"]
+    smoke_c = lookup["smoke_phase_c_best"]
+    smoke_d = lookup["smoke_phase_d_best"]
+    large_c = lookup["large_phase_c_best_recommended"]
+    large_d_latest = lookup["large_phase_d_same_notebook_latest"]
+    dedicated_d = lookup["dedicated_phase_d_best"]
+    return [
+        f"The baseline row starts at exact match {format_float(baseline['Exact Match'])}, parseable rate {format_float(baseline['Parseable Rate'])}, malformed rate {format_float(baseline['Malformed Rate'])}, and truncation rate {format_float(baseline['Truncation Rate'])}.",
+        f"Smoke Phase A moved exact match to {format_float(smoke_a['Exact Match'])} but still had weak structure, with parseable rate {format_float(smoke_a['Parseable Rate'])} and truncation rate {format_float(smoke_a['Truncation Rate'])}.",
+        f"Smoke Phase B fixed structure on the tiny split: parseable rate reached {format_float(smoke_b['Parseable Rate'])}, malformed and truncation both dropped to {format_float(smoke_b['Malformed Rate'])}, but exact match stayed at {format_float(smoke_b['Exact Match'])}.",
+        f"Smoke Phase C kept that strong structure profile but still sat at exact match {format_float(smoke_c['Exact Match'])}, which shows the small split had likely hit a correctness ceiling.",
+        f"Smoke Phase D did not improve over Smoke Phase C; exact match stayed at {format_float(smoke_d['Exact Match'])} while structure regressed back to parseable rate {format_float(smoke_d['Parseable Rate'])} and truncation rate {format_float(smoke_d['Truncation Rate'])}.",
+        f"Larger-split Phase C is the key jump: exact match rose to {format_float(large_c['Exact Match'])}, composite score to {format_float(large_c['Composite Score'])}, while structure stayed perfect.",
+        f"The same-notebook Phase D branch shows why checkpoint-aware selection matters: its latest checkpoint fell to exact match {format_float(large_d_latest['Exact Match'])} even though the branch had reached {format_float(lookup['large_phase_d_same_notebook_best']['Exact Match'])} earlier.",
+        f"The dedicated Phase D rerun recovered to exact match {format_float(dedicated_d['Exact Match'])}, matching but not beating the recommended larger-split Phase C checkpoint.",
+    ]
+
+
+def analysis_for_all_checkpoints(rows: list[dict[str, Any]]) -> list[str]:
+    artifact_rows = [row for row in rows if row["Run Family"] != "baseline_pre_refactor"]
+    large_c_rows = [row for row in rows if row["Run Family"] == "large_split_continue" and row["Phase"] == "phase_c"]
+    large_d_rows = [row for row in rows if row["Run Family"] == "large_split_continue" and row["Phase"] == "phase_d"]
+    dedicated_d_rows = [row for row in rows if row["Run Family"] == "phase_d_dedicated" and row["Phase"] == "phase_d"]
+    alias_rows = [row for row in artifact_rows if row["Alias Roles"]]
+    best_vs_latest_different = [
+        row["Phase Label"]
+        for row in artifact_rows
+        if row["Is Best Composite"] and not row["Is Latest"]
+    ]
+    large_c_exact = [float(row["Exact Match"]) for row in large_c_rows if isinstance(row.get("Exact Match"), (int, float))]
+    return [
+        f"The table contains {len(rows)} rows in total, including {len(artifact_rows)} artifact-backed checkpoint rows and one baseline reference row.",
+        f"{len(alias_rows)} rows carry at least one alias label, which makes it possible to compare best-structure, best-correctness, best-composite, and latest checkpoints directly.",
+        f"The larger-split Phase C trajectory is explicitly non-monotonic: exact match ranges from {format_float(min(large_c_exact))} to {format_float(max(large_c_exact))} across checkpoints 60 to 602.",
+        f"In the larger-split Phase C run, best composite landed at checkpoint-120 while latest was checkpoint-602; both ended strong, but the mid-run oscillation shows why phase-level alias selection still matters.",
+        f"In the larger-split Phase D same-notebook branch, best composite was checkpoint-60 while latest was checkpoint-130, confirming that later checkpoints could regress.",
+        f"The dedicated Phase D branch is short but informative: checkpoint-120 was weak at exact match {format_float(dedicated_d_rows[1]['Exact Match']) if len(dedicated_d_rows) > 1 else 'n/a'}, and checkpoint-130 recovered to {format_float(dedicated_d_rows[-1]['Exact Match'])}.",
+        f"The smoke rows show the same structure-first pattern: Phase B and Phase C remained at exact match 0.5 while structure stayed perfect, then the larger split moved correctness upward.",
+    ]
+
+
+def analysis_for_resource_runtime(rows: list[dict[str, Any]]) -> list[str]:
+    reference = rows[0]
+    smoke = rows[1]
+    large_c = rows[2]
+    same_notebook_d = rows[3]
+    dedicated_d = rows[4]
+    return [
+        f"The reference row shows the high-capacity default profile, while every successful Kaggle run used the much smaller `kaggle_t4` profile instead.",
+        f"The stable Kaggle T4 profile cut sequence length from {reference['max_seq_length']} to {smoke['max_seq_length']}, image size from {reference['image_size']} to {smoke['image_size']}, generations from {reference['num_generations']} to {smoke['num_generations']}, and LoRA rank from {reference['LoRA Rank']} to {smoke['LoRA Rank']}.",
+        f"The smoke Phase A row shows that this lower-memory profile was sufficient to validate the full RL loop on `testmini`.",
+        f"The large Phase C row shows the key resource-constrained result: the train split increased from `{smoke['Train Split']}` to `{large_c['Train Split']}` while the core T4 profile stayed the same, which supports the interpretation that split size mainly increased runtime rather than per-step VRAM.",
+        f"The same-notebook and dedicated Phase D rows show that the same T4-safe profile could support specialization runs as well, although the dedicated rerun was needed to preserve earlier outputs and recover the better final score.",
+    ]
+
+
+def analysis_for_knob_tradeoffs(rows: list[dict[str, Any]]) -> list[str]:
+    lookup = {row["Knob"]: row for row in rows}
+    seq_default = float(lookup["max_seq_length"]["Default"])
+    seq_t4 = float(lookup["max_seq_length"]["Kaggle T4"])
+    prompt_default = float(lookup["max_prompt_length"]["Default"])
+    prompt_t4 = float(lookup["max_prompt_length"]["Kaggle T4"])
+    completion_default = float(lookup["max_completion_length"]["Default"])
+    completion_t4 = float(lookup["max_completion_length"]["Kaggle T4"])
+    image_default = float(lookup["image_size"]["Default"])
+    image_t4 = float(lookup["image_size"]["Kaggle T4"])
+    area_reduction = 1.0 - (image_t4 * image_t4) / (image_default * image_default)
+    return [
+        f"The biggest headline reduction was sequence length: {int(seq_default)} to {int(seq_t4)}, which is about a {format_float((1 - seq_t4 / seq_default) * 100)}% cut.",
+        f"Prompt budget dropped from {int(prompt_default)} to {int(prompt_t4)} and completion budget from {int(completion_default)} to {int(completion_t4)}, which traded long-form reasoning space for lower generation-time memory use.",
+        f"Image size fell from {int(image_default)} to {int(image_t4)}; in area terms that is roughly a {format_float(area_reduction * 100)}% reduction in pixel workload for the vision stack.",
+        f"LoRA rank and number of generations were both halved, which directly reduced trainable state and multi-sample generation cost.",
+        f"The table makes the tradeoff explicit: almost every memory-saving change came with a loss in context budget, visual detail, or exploration diversity.",
+    ]
+
+
+def analysis_for_timeline(rows: list[dict[str, Any]]) -> list[str]:
+    labels = [row["Event Label"] for row in rows]
+    return [
+        f"The timeline contains {len(rows)} milestone events: {' -> '.join(labels)}.",
+        "It shows a clear order of improvement: baseline weakness, smoke-run validation, smoke-run structure stabilization, then larger-split correctness improvement.",
+        "The smoke Phase D milestone marks the point where the small split stopped helping, which is why the next successful move was to scale the data rather than keep iterating on the same tiny split.",
+        "Large Phase C is the first milestone where correctness clearly improved beyond the smoke plateau, and both later Phase D branches should be read as specialization branches rather than primary replacements for that checkpoint.",
+    ]
+
+
 def plot_runtime_timeline(rows: list[dict[str, Any]]) -> None:
     import matplotlib
 
@@ -1462,10 +1894,15 @@ def write_readme(milestones: list[dict[str, Any]], all_rows: list[dict[str, Any]
         "",
         "Generated tables:",
         "- `tables/master_table_milestones.csv`",
+        "- `tables/master_table_milestones.md`",
         "- `tables/master_table_all_checkpoints.csv`",
+        "- `tables/master_table_all_checkpoints.md`",
         "- `tables/resource_runtime_tuning.csv`",
+        "- `tables/resource_runtime_tuning.md`",
         "- `tables/resource_knob_tradeoffs.csv`",
+        "- `tables/resource_knob_tradeoffs.md`",
         "- `tables/runtime_stabilization_timeline.csv`",
+        "- `tables/runtime_stabilization_timeline.md`",
         "",
         "Generated plots:",
         "- `plots/evolution_panels.png`",
@@ -1524,6 +1961,66 @@ def write_data_sources() -> None:
     (RESULTS_DIR / "data_sources.json").write_text(json.dumps(payload, indent=2) + "\n")
 
 
+def write_table_docs(
+    milestone_rows: list[dict[str, Any]],
+    all_rows: list[dict[str, Any]],
+    resource_rows: list[dict[str, Any]],
+    knob_rows: list[dict[str, Any]],
+    timeline_rows: list[dict[str, Any]],
+) -> None:
+    master_glossary = render_column_glossary(MASTER_COLUMN_GROUPS, MASTER_COLUMN_DESCRIPTIONS)
+    resource_glossary = render_column_glossary(
+        [("Resource Runtime Tuning Columns", list(resource_rows[0].keys()))], RESOURCE_RUNTIME_COLUMN_DESCRIPTIONS
+    )
+    knob_glossary = render_column_glossary(
+        [("Resource Knob Tradeoff Columns", list(knob_rows[0].keys()))], RESOURCE_KNOB_COLUMN_DESCRIPTIONS
+    )
+    timeline_glossary = render_column_glossary(
+        [("Runtime Stabilization Timeline Columns", list(timeline_rows[0].keys()))], TIMELINE_COLUMN_DESCRIPTIONS
+    )
+
+    write_markdown_doc(
+        markdown_path=TABLES_DIR / "master_table_milestones.md",
+        title="Master Table A: Milestones Only",
+        csv_name="tables/master_table_milestones.csv",
+        purpose="Compact report-ready summary of the baseline, major phase milestones, important regressions, and final checkpoint recommendations.",
+        glossary_markdown=master_glossary,
+        analysis_lines=analysis_for_milestones(milestone_rows),
+    )
+    write_markdown_doc(
+        markdown_path=TABLES_DIR / "master_table_all_checkpoints.md",
+        title="Master Table B: Every Checkpoint Row",
+        csv_name="tables/master_table_all_checkpoints.csv",
+        purpose="Checkpoint-level audit trail covering every locally available evaluated checkpoint across smoke, larger-split, and dedicated Phase D runs.",
+        glossary_markdown=master_glossary,
+        analysis_lines=analysis_for_all_checkpoints(all_rows),
+    )
+    write_markdown_doc(
+        markdown_path=TABLES_DIR / "resource_runtime_tuning.md",
+        title="Table C: Resource-Constrained Runtime Tuning",
+        csv_name="tables/resource_runtime_tuning.csv",
+        purpose="Configuration-and-outcome view showing how the stable Kaggle T4 profile differs from the reference default profile and what each successful run achieved under the constrained profile.",
+        glossary_markdown=resource_glossary,
+        analysis_lines=analysis_for_resource_runtime(resource_rows),
+    )
+    write_markdown_doc(
+        markdown_path=TABLES_DIR / "resource_knob_tradeoffs.md",
+        title="Resource Knob Tradeoffs",
+        csv_name="tables/resource_knob_tradeoffs.csv",
+        purpose="Per-knob explanation of how the Kaggle T4 profile reduced memory pressure and what tradeoffs were accepted in exchange.",
+        glossary_markdown=knob_glossary,
+        analysis_lines=analysis_for_knob_tradeoffs(knob_rows),
+    )
+    write_markdown_doc(
+        markdown_path=TABLES_DIR / "runtime_stabilization_timeline.md",
+        title="Runtime Stabilization Timeline",
+        csv_name="tables/runtime_stabilization_timeline.csv",
+        purpose="Chronological milestone view showing how the project moved from the weak baseline to smoke validation, larger-split correctness gains, and dedicated Phase D specialization.",
+        glossary_markdown=timeline_glossary,
+        analysis_lines=analysis_for_timeline(timeline_rows),
+    )
+
+
 def sanitize_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     sanitized = []
     for row in rows:
@@ -1553,6 +2050,7 @@ def main() -> None:
     write_csv(TABLES_DIR / "resource_runtime_tuning.csv", resource_rows, list(resource_rows[0].keys()))
     write_csv(TABLES_DIR / "resource_knob_tradeoffs.csv", knob_rows, list(knob_rows[0].keys()))
     write_csv(TABLES_DIR / "runtime_stabilization_timeline.csv", timeline_rows, list(timeline_rows[0].keys()))
+    write_table_docs(milestone_rows, all_rows, resource_rows, knob_rows, timeline_rows)
 
     plot_main_evolution(all_rows)
     plot_runtime_timeline(timeline_rows)
