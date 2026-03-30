@@ -1,0 +1,437 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\newcommand{\ind}{\mathbf{1}}
+\newcommand{\None}{\mathrm{None}}
+\renewcommand{\arraystretch}{1.15}
+
+\begin{document}
+
+\title{Reward Formula Cheatsheet}
+\author{}
+\date{}
+\maketitle
+
+\section*{Source of Truth}
+\begin{itemize}
+\item \texttt{staged\_rl/rewarding.py}
+\item \texttt{staged\_rl/controller.py}
+\item \texttt{staged\_rl/config.py}
+\item \texttt{staged\_rl/parsing.py}
+\item \texttt{staged\_rl/trainer\_runtime.py}
+\end{itemize}
+
+\section*{1. Notation}
+Let:
+\begin{align*}
+&c && \text{completion text} \\
+&g && \text{gold answer} \\
+&m \in \{\texttt{numeric\_free\_form}, \texttt{multi\_choice}\} && \text{answer mode} \\
+&\mathcal{C} && \text{choice list for multi-choice examples} \\
+&L && \texttt{max\_completion\_length} \\
+&\mathrm{tok}(c) && \text{completion token count} \\
+&q(c) = \frac{\mathrm{tok}(c)}{\max(L,1)} && \text{completion-length ratio} \\
+&\ind[\cdot] && \text{indicator function.}
+\end{align*}
+
+Token count is computed as tokenizer-encoded length when a tokenizer is available, otherwise by whitespace splitting.
+
+\section*{2. Helper Predicates Used by Reward Functions}
+
+\subsection*{Tag compliance}
+\[
+\mathrm{ReasoningTag}(c) = \ind\!\left[\#\mathrm{ReasoningBlocks}(c)=1\right]
+\]
+\[
+\mathrm{SolutionTag}(c) = \ind\!\left[\#\mathrm{SolutionBlocks}(c)=1\right].
+\]
+
+\subsection*{Malformed answer}
+For numeric free-form:
+\[
+\mathrm{Malformed}(c,\texttt{numeric\_free\_form})
+=
+\ind\!\left[
+\#\mathrm{SolutionBlocks}(c)\neq 1
+\;\vee\;
+\mathrm{solution\_text}(c)=\varnothing
+\;\vee\;
+\mathrm{parse\_float\_safe}(\mathrm{solution\_text}(c))=\None
+\right].
+\]
+
+For multi-choice:
+\[
+\mathrm{Malformed}(c,\texttt{multi\_choice})
+=
+\ind\!\left[
+\mathrm{option\_letter}(c)=\None
+\right].
+\]
+
+\subsection*{Finished completion}
+\[
+\mathrm{Finished}(c,m)
+=
+\ind\!\left[
+\mathrm{ReasoningTag}(c)=1
+\;\wedge\;
+\mathrm{SolutionTag}(c)=1
+\;\wedge\;
+\mathrm{Malformed}(c,m)=0
+\right].
+\]
+
+\subsection*{Exact match}
+For numeric free-form:
+\[
+\mathrm{Exact}(c,g,\texttt{numeric\_free\_form},\mathcal{C})
+=
+\ind\!\left[
+\mathrm{norm}(\mathrm{solution\_text}(c))
+=
+\mathrm{norm}(g)
+\neq
+\None
+\right].
+\]
+
+For multi-choice:
+\[
+\mathrm{Exact}(c,g,\texttt{multi\_choice},\mathcal{C})
+=
+\ind\!\left[
+\mathrm{option\_letter}(c)
+=
+\mathrm{gold\_option\_letter}(g,\mathcal{C})
+\neq
+\None
+\right].
+\]
+
+\subsection*{Tolerance match}
+Tolerance reward only applies to numeric free-form records.
+
+\[
+\mathrm{TolMatch}(c,g,\texttt{numeric\_free\_form},p)
+=
+\ind\!\left[
+\left|x-y\right|
+\le
+\max\!\left(\mathrm{rel\_tol}\cdot\max(|x|,|y|),\,\mathrm{abs\_tol}\right)
+\right],
+\]
+where
+\[
+x = \mathrm{float}(\mathrm{solution\_text}(c)),
+\qquad
+y = \mathrm{float}(g).
+\]
+
+The tolerance parameters are:
+\[
+(\mathrm{abs\_tol}, \mathrm{rel\_tol}) =
+\begin{cases}
+(10^{-p}, \max(10^{-p}, 10^{-6})) & \text{if precision } p \text{ is provided}, \\
+(10^{-6}, 10^{-6}) & \text{if precision is not provided.}
+\end{cases}
+\]
+
+For non-numeric answer modes:
+\[
+\mathrm{TolMatch}(c,g,m,p) = 0 \qquad \text{if } m \neq \texttt{numeric\_free\_form}.
+\]
+
+\section*{3. Per-Sample Reward Components}
+
+\subsection*{Format reward}
+\[
+R_{\mathrm{format}}(c,m)
+=
+\mathrm{ReasoningTag}(c)
++
+\mathrm{SolutionTag}(c)
+-
+0.5\,\mathrm{Malformed}(c,m).
+\]
+
+\subsection*{Parseable reward}
+For numeric free-form:
+\[
+R_{\mathrm{parseable}}(c,\texttt{numeric\_free\_form})
+=
+\ind\!\left[
+\mathrm{solution\_text}(c)\neq \None
+\;\wedge\;
+\mathrm{parse\_float\_safe}(\mathrm{solution\_text}(c))\neq \None
+\right].
+\]
+
+For multi-choice:
+\[
+R_{\mathrm{parseable}}(c,\texttt{multi\_choice})
+=
+\ind\!\left[
+\mathrm{Malformed}(c,\texttt{multi\_choice})=0
+\right].
+\]
+
+\subsection*{Finished reward}
+\[
+R_{\mathrm{finished}}(c,m)
+=
+\begin{cases}
+1, & \mathrm{Finished}(c,m)=1 \;\wedge\; \mathrm{tok}(c)<L, \\
+-1, & \mathrm{tok}(c)\ge L \;\wedge\; \mathrm{Finished}(c,m)=0, \\
+0, & \text{otherwise.}
+\end{cases}
+\]
+
+\subsection*{Correctness reward}
+\[
+R_{\mathrm{correctness}}(c,g,m,\mathcal{C})
+=
+\mathrm{Exact}(c,g,m,\mathcal{C}).
+\]
+
+\subsection*{Brevity reward}
+\[
+R_{\mathrm{brevity}}(c)
+=
+\begin{cases}
+-1, & \mathrm{tok}(c)\ge L, \\
+1, & q(c)\le 0.55, \\
+0.5, & 0.55 < q(c)\le 0.75, \\
+0, & 0.75 < q(c)\le 0.90, \\
+-0.5, & 0.90 < q(c)<1.
+\end{cases}
+\]
+
+\subsection*{Tolerance reward}
+Let $\phi \in \{0,1\}$ indicate whether tolerance reward is enabled for the phase.
+
+\[
+R_{\mathrm{tolerance}}(c,g,m,p,\phi)
+=
+\begin{cases}
+0, & \phi = 0, \\
+0, & m \neq \texttt{numeric\_free\_form}, \\
+0, & \mathrm{Exact}(c,g,m,\mathcal{C}) = 1, \\
+1, & \mathrm{TolMatch}(c,g,m,p) = 1, \\
+0, & \text{otherwise.}
+\end{cases}
+\]
+
+\section*{4. Total Reward}
+The runtime builds reward functions in this fixed order:
+\[
+[
+\texttt{format\_reward},
+\texttt{parseable\_reward},
+\texttt{finished\_reward},
+\texttt{correctness\_reward},
+\texttt{brevity\_reward},
+\texttt{tolerance\_reward}
+].
+\]
+
+Let the current weights be
+\[
+\mathbf{w}
+=
+\left(
+w_{\mathrm{format}},
+w_{\mathrm{parseable}},
+w_{\mathrm{finished}},
+w_{\mathrm{correctness}},
+w_{\mathrm{brevity}},
+w_{\mathrm{tolerance}}
+\right).
+\]
+
+Then the total sample reward is
+\begin{align*}
+R_{\mathrm{total}}
+=\;&
+w_{\mathrm{format}} R_{\mathrm{format}}
++ w_{\mathrm{parseable}} R_{\mathrm{parseable}}
++ w_{\mathrm{finished}} R_{\mathrm{finished}} \\
+&+ w_{\mathrm{correctness}} R_{\mathrm{correctness}}
++ w_{\mathrm{brevity}} R_{\mathrm{brevity}}
++ w_{\mathrm{tolerance}} R_{\mathrm{tolerance}}.
+\end{align*}
+
+If a component is disabled or absent from the active weight map, its effective weight is $0$.
+
+\section*{5. Initial Weights and Bounds}
+
+\subsection*{Generic initialization}
+For any reward component $r$:
+\[
+w_r^{(0)}
+=
+\begin{cases}
+\mathrm{initial\_weight}_r, & \text{if component } r \text{ is enabled}, \\
+0, & \text{if component } r \text{ is disabled.}
+\end{cases}
+\]
+
+\subsection*{Per-component bounds}
+\[
+(l_r, u_r) =
+\begin{cases}
+(0.25, 2.0), & r=\texttt{format\_reward}, \\
+(0.25, 2.0), & r=\texttt{parseable\_reward}, \\
+(0.50, 2.0), & r=\texttt{finished\_reward}, \\
+(1.00, 8.0), & r=\texttt{correctness\_reward}, \\
+(0.00, 1.0), & r=\texttt{brevity\_reward}, \\
+(0.00, 2.0), & r=\texttt{tolerance\_reward}.
+\end{cases}
+\]
+
+\subsection*{Default initial weights by phase}
+\[
+\begin{array}{l|cccccc}
+\text{Phase}
+& w_{\mathrm{correctness}}^{(0)}
+& w_{\mathrm{parseable}}^{(0)}
+& w_{\mathrm{format}}^{(0)}
+& w_{\mathrm{finished}}^{(0)}
+& w_{\mathrm{brevity}}^{(0)}
+& w_{\mathrm{tolerance}}^{(0)} \\
+\hline
+\text{phase\_a} & 2.0 & 1.0 & 1.0 & 1.5 & 0.25 & 0.0 \\
+\text{phase\_b} & 4.0 & 0.75 & 0.75 & 1.0 & 0.20 & 0.0 \\
+\text{phase\_c} & 5.0 & 0.50 & 0.50 & 0.75 & 0.20 & 1.0 \\
+\text{phase\_d} & 5.0 & 0.50 & 0.50 & 0.75 & 0.30 & 1.0 \\
+\text{phase\_e} & 4.0 & 0.75 & 0.75 & 1.0 & 0.20 & 0.0
+\end{array}
+\]
+
+\section*{6. Metric-Gated Reward Weight Updates}
+After each checkpoint evaluation, the controller updates the weight vector using eval metrics.
+
+Let
+\begin{align*}
+&p_t &&= \texttt{parseable\_answer\_rate}, \\
+&s_t &&= \texttt{solution\_tag\_compliance}, \\
+&r_t &&= \texttt{reasoning\_tag\_compliance}, \\
+&m_t &&= \texttt{malformed\_answer\_rate}, \\
+&u_t &&= \texttt{truncation\_rate}, \\
+&a_t &&= \texttt{average\_completion\_tokens}, \\
+&e_t &&= \texttt{normalized\_exact\_match}.
+\end{align*}
+
+The controller applies the following updates in sequence.
+
+\subsection*{Parseability guard}
+\[
+w_{\mathrm{parseable}}
+\leftarrow
+\begin{cases}
+\max(w_{\mathrm{parseable}}, 0.75), & p_t < 0.85, \\
+w_{\mathrm{parseable}}, & \text{otherwise.}
+\end{cases}
+\]
+
+\subsection*{Formatting guard}
+\[
+w_{\mathrm{format}}
+\leftarrow
+\begin{cases}
+\max(w_{\mathrm{format}}, 0.75), & s_t < 0.90, \\
+\max(w_{\mathrm{format}}, 0.75), & r_t < 0.88, \\
+\max(w_{\mathrm{format}}, 0.75), & m_t > 0.10, \\
+w_{\mathrm{format}}, & \text{otherwise.}
+\end{cases}
+\]
+
+\subsection*{Finish-pressure update}
+\[
+w_{\mathrm{finished}}
+\leftarrow
+\begin{cases}
+w_{\mathrm{finished}} + 0.25, & u_t > 0.15, \\
+w_{\mathrm{finished}} + 0.25, & a_t > 0.85L, \\
+w_{\mathrm{finished}}, & \text{otherwise.}
+\end{cases}
+\]
+
+\subsection*{Correctness-pressure update}
+Define the structural-stability condition
+\[
+\mathrm{Stable}_t
+=
+\ind\!\left[
+p_t \ge 0.92
+\;\wedge\;
+s_t \ge 0.95
+\;\wedge\;
+r_t \ge 0.93
+\;\wedge\;
+m_t \le 0.05
+\;\wedge\;
+u_t \le 0.08
+\right].
+\]
+
+Let the controller keep a history window of size $2$. If the window exists, let
+\[
+e_{t-1}^{\star}
+\]
+be the earliest exact-match value inside the most recent 2-checkpoint window. Then
+\[
+w_{\mathrm{correctness}}
+\leftarrow
+\begin{cases}
+w_{\mathrm{correctness}} + 0.50,
+& \mathrm{Stable}_t = 1
+\;\wedge\;
+(e_t - e_{t-1}^{\star}) < 0.02, \\
+w_{\mathrm{correctness}}, & \text{otherwise.}
+\end{cases}
+\]
+
+\subsection*{Hard floors}
+\[
+w_{\mathrm{format}} \leftarrow \max(w_{\mathrm{format}}, 0.25)
+\]
+\[
+w_{\mathrm{parseable}} \leftarrow \max(w_{\mathrm{parseable}}, 0.25)
+\]
+\[
+w_{\mathrm{finished}} \leftarrow \max(w_{\mathrm{finished}}, 0.50).
+\]
+
+\subsection*{Final clamping}
+For every component $r$:
+\[
+w_r \leftarrow \min(\max(w_r, l_r), u_r).
+\]
+
+\section*{7. End-to-End Reward Equation}
+Putting everything together, the reward used by the trainer at a given time step is
+\[
+R_{\mathrm{total}}(c,g,m,\mathcal{C},p;\mathbf{w})
+=
+\sum_{r \in \mathcal{R}} w_r \, R_r(c,g,m,\mathcal{C},p),
+\]
+where
+\[
+\mathcal{R}
+=
+\{
+\mathrm{format},
+\mathrm{parseable},
+\mathrm{finished},
+\mathrm{correctness},
+\mathrm{brevity},
+\mathrm{tolerance}
+\},
+\]
+and the current weights $\mathbf{w}$ are the phase-initialized, metric-gated, and bounded values defined above.
+
+\end{document}

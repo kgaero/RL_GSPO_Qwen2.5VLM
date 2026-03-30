@@ -1186,6 +1186,124 @@ def minmax_normalize(values: list[float | None], invert: bool = False) -> list[f
     return normalized
 
 
+def run_family_plot_code(run_family: str) -> str:
+    return {
+        "baseline_pre_refactor": "base",
+        "smoke_testmini": "smk",
+        "large_split_continue": "lgc",
+        "phase_d_dedicated": "dpd",
+    }.get(run_family, "run")
+
+
+def compact_phase_header(label: str, span: int) -> str:
+    if label == "Baseline":
+        return "Base"
+    if label.startswith("Smoke Phase "):
+        suffix = label.removeprefix("Smoke Phase ")
+        return f"Smoke {suffix}" if span <= 3 else label
+    if label.startswith("Large Phase "):
+        suffix = label.removeprefix("Large Phase ")
+        return f"Large {suffix}" if span <= 3 else label
+    if label == "Dedicated Phase D":
+        return "Dedicated D" if span <= 4 else label
+    return label
+
+
+KEY_CURRICULUM_MILESTONE_IDS = [
+    "baseline_local_snapshot",
+    "smoke_phase_a_best",
+    "smoke_phase_b_best",
+    "smoke_phase_c_best",
+    "smoke_phase_d_best",
+    "large_phase_c_best_recommended",
+    "large_phase_d_same_notebook_best",
+    "dedicated_phase_d_best",
+]
+
+PHASE_CURRICULUM_MILESTONE_IDS = KEY_CURRICULUM_MILESTONE_IDS[1:]
+
+STAGE_ORDER = [
+    "stage1_easy_numeric",
+    "stage2_float_numeric",
+    "stage3_hard_numeric",
+]
+
+STAGE_DISPLAY = {
+    "stage1_easy_numeric": "Stage 1\nEasy Numeric",
+    "stage2_float_numeric": "Stage 2\nMedium / Float",
+    "stage3_hard_numeric": "Stage 3\nHard Numeric",
+}
+
+STAGE_SHORT = {
+    "stage1_easy_numeric": "S1",
+    "stage2_float_numeric": "S2",
+    "stage3_hard_numeric": "S3",
+}
+
+STAGE_COLORS = {
+    "stage1_easy_numeric": "#4c78a8",
+    "stage2_float_numeric": "#f58518",
+    "stage3_hard_numeric": "#e45756",
+}
+
+RUN_FAMILY_COLORS = {
+    "baseline_pre_refactor": "#7f7f7f",
+    "smoke_testmini": "#4c78a8",
+    "large_split_continue": "#e45756",
+    "phase_d_dedicated": "#72b7b2",
+}
+
+SPLIT_DISPLAY = {
+    "unknown_pre_refactor": "unknown",
+    "testmini": "testmini",
+    "test": "test",
+}
+
+
+def key_curriculum_rows(milestone_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    lookup = {row["Milestone ID"]: row for row in milestone_rows}
+    return [lookup[milestone_id] for milestone_id in KEY_CURRICULUM_MILESTONE_IDS if milestone_id in lookup]
+
+
+def phase_curriculum_rows(milestone_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    lookup = {row["Milestone ID"]: row for row in milestone_rows}
+    return [lookup[milestone_id] for milestone_id in PHASE_CURRICULUM_MILESTONE_IDS if milestone_id in lookup]
+
+
+def parse_stage_mix_text(stage_mix_text: str) -> dict[str, float]:
+    text = (stage_mix_text or "").strip()
+    if not text or "baseline" in text:
+        return {}
+    result: dict[str, float] = {}
+    for part in text.split(";"):
+        chunk = part.strip()
+        if not chunk or "=" not in chunk:
+            continue
+        name, value = chunk.split("=", 1)
+        try:
+            result[name.strip()] = float(value.strip())
+        except ValueError:
+            continue
+    return result
+
+
+def compact_stage_mix_text(stage_mix_text: str) -> str:
+    mix = parse_stage_mix_text(stage_mix_text)
+    if not mix:
+        return "no staged curriculum"
+    return ", ".join(f"{STAGE_SHORT.get(stage_name, stage_name)} {weight:.0%}" for stage_name, weight in mix.items())
+
+
+def stage_mix_vector(stage_mix_text: str) -> list[float]:
+    mix = parse_stage_mix_text(stage_mix_text)
+    return [float(mix.get(stage_name, 0.0)) for stage_name in STAGE_ORDER]
+
+
+def save_plot_dual(fig: Any, stem: str) -> None:
+    fig.savefig(PLOTS_DIR / f"{stem}.png", dpi=220, bbox_inches="tight")
+    fig.savefig(PLOTS_DIR / f"{stem}.svg", bbox_inches="tight")
+
+
 def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
     import matplotlib
 
@@ -1195,15 +1313,39 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
 
     plot_rows = checkpoint_rows_for_plot(rows)
     x = [row["Timeline Order"] for row in plot_rows]
-    labels = [row["X Label"] for row in plot_rows]
+    plot_labels = []
+    for row in plot_rows:
+        if row["Phase"] == "baseline":
+            plot_labels.append("base")
+            continue
+        phase_short = row["Phase"].replace("phase_", "")
+        plot_labels.append(f"{run_family_plot_code(row['Run Family'])}:{phase_short}:{row['Global Step']}")
+
+    x_tick_labels = list(plot_labels)
+
+    split_to_y = {"unknown_pre_refactor": 0, "testmini": 1, "test": 2}
+    stage_series_lookup = {
+        "Stage 1 (Easy Numeric)": [],
+        "Stage 2 (Medium/Float)": [],
+        "Stage 3 (Hard Numeric)": [],
+    }
+    for row in plot_rows:
+        if row["Phase"] == "baseline":
+            mix_values = [math.nan, math.nan, math.nan]
+        else:
+            mix_values = stage_mix_vector(row["Stage Mix / Curriculum"])
+        stage_series_lookup["Stage 1 (Easy Numeric)"].append(mix_values[0])
+        stage_series_lookup["Stage 2 (Medium/Float)"].append(mix_values[1])
+        stage_series_lookup["Stage 3 (Hard Numeric)"].append(mix_values[2])
 
     fig, axes = plt.subplots(
-        5,
+        10,
         1,
-        figsize=(22, 20),
+        figsize=(22, 33),
         sharex=True,
-        gridspec_kw={"height_ratios": [1.3, 1.2, 1.2, 1.2, 0.55], "hspace": 0.08},
+        gridspec_kw={"height_ratios": [1.0, 1.0, 0.9, 1.0, 1.0, 1.25, 0.75, 0.85, 0.9, 0.65], "hspace": 0.10},
     )
+    fig.subplots_adjust(right=0.84)
 
     segments: list[tuple[int, int, str]] = []
     if plot_rows:
@@ -1218,22 +1360,93 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
             previous_x = row["Timeline Order"]
         segments.append((start, previous_x, current_label))
 
-    def add_segments(ax: Any) -> None:
+    def add_segments(ax: Any, label_position: str | None = None) -> None:
         for index, (start, end, label) in enumerate(segments):
             ax.axvspan(start - 0.5, end + 0.5, color=("#f7f7f7" if index % 2 == 0 else "#eef3f9"), alpha=0.7, zorder=0)
             ax.axvline(end + 0.5, color="#bbbbbb", linestyle="--", linewidth=0.7)
-            ax.text((start + end) / 2, 1.02, label, transform=ax.get_xaxis_transform(), ha="center", va="bottom", fontsize=9)
+            if label_position:
+                span = end - start + 1
+                display_label = compact_phase_header(label, span)
+                if label_position == "top":
+                    y_offset = 1.085
+                    va = "bottom"
+                else:
+                    y_offset = -0.98
+                    va = "top"
+                ax.text(
+                    (start + end) / 2,
+                    y_offset,
+                    display_label,
+                    transform=ax.get_xaxis_transform(),
+                    ha="center",
+                    va=va,
+                    fontsize=8.5,
+                    linespacing=0.95,
+                    bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.85, "pad": 0.6},
+                    clip_on=False,
+                )
 
     def extract_series(key: str) -> list[float | None]:
+        if key in stage_series_lookup:
+            return stage_series_lookup[key]
         return [row.get(key) if isinstance(row.get(key), (int, float)) else None for row in plot_rows]
 
     panel_specs = [
         (
             axes[0],
+            "Exact Match",
+            [
+                ("Exact Match", "#d62728"),
+            ],
+            False,
+            "score",
+        ),
+        (
+            axes[1],
+            "Reasoning Tag Compliance / Solution Tag Compliance / Truncation Rate",
+            [
+                ("Reasoning Tag Compliance", "#1f77b4"),
+                ("Solution Tag Compliance", "#2ca02c"),
+                ("Truncation Rate", "#d62728"),
+            ],
+            False,
+            "rate",
+        ),
+        (
+            axes[2],
+            "KL Mean / KL P95",
+            [
+                ("KL Mean", "#9467bd"),
+                ("KL P95", "#ff7f0e"),
+            ],
+            False,
+            "kl",
+        ),
+        (
+            axes[3],
+            "Generation Length / Reward",
+            [
+                ("Average Completion Tokens", "#d62728"),
+                ("Average Total Reward", "#9467bd"),
+            ],
+            False,
+            "",
+        ),
+        (
+            axes[4],
+            "Generation Diversity / Repetition",
+            [
+                ("Sample Diversity", "#2ca02c"),
+                ("Repetition Rate", "#1f77b4"),
+            ],
+            False,
+            "rate",
+        ),
+        (
+            axes[5],
             "Reward Weight Evolution",
             [
                 ("Correctness Weight", "#d62728"),
-                ("Formatting Weight", "#1f77b4"),
                 ("Parseability Weight", "#2ca02c"),
                 ("Finished Weight", "#9467bd"),
                 ("Tolerance Weight", "#ff7f0e"),
@@ -1243,62 +1456,110 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
             "weight",
         ),
         (
-            axes[1],
-            "Structure Evolution",
+            axes[6],
+            "Reward Weight Evolution continued",
             [
-                ("Parseable Rate", "#2ca02c"),
-                ("Reasoning Tag Compliance", "#1f77b4"),
-                ("Solution Tag Compliance", "#ff7f0e"),
-                ("Well-Formed Rate", "#9467bd"),
-                ("Completion Success Rate", "#d62728"),
+                ("Formatting Weight", "#1f77b4"),
             ],
-            False,
-            "rate",
+            True,
+            "weight",
         ),
         (
-            axes[2],
-            "Accuracy Evolution",
-            [
-                ("Exact Match", "#d62728"),
-                ("Tolerance Accuracy", "#ff7f0e"),
-                ("Best-of-k Accuracy", "#1f77b4"),
-                ("Composite Score", "#2ca02c"),
-            ],
+            axes[7],
+            "Checkpointwise Split Transition",
+            [],
             False,
-            "score",
+            "split",
         ),
         (
-            axes[3],
-            "Generation Behavior (normalized mixed-unit view)",
+            axes[8],
+            "Checkpointwise Stage Relationship / Mix",
             [
-                ("Average Completion Tokens", "#d62728"),
-                ("Repetition Rate", "#1f77b4"),
-                ("Sample Diversity", "#2ca02c"),
-                ("Average Total Reward", "#9467bd"),
+                ("Stage 1 (Easy Numeric)", STAGE_COLORS["stage1_easy_numeric"]),
+                ("Stage 2 (Medium/Float)", STAGE_COLORS["stage2_float_numeric"]),
+                ("Stage 3 (Hard Numeric)", STAGE_COLORS["stage3_hard_numeric"]),
             ],
-            False,
-            "normalized",
+            True,
+            "mix",
         ),
     ]
 
-    for ax, title, series_specs, step_mode, y_label in panel_specs:
-        add_segments(ax)
-        for key, color in series_specs:
-            values = extract_series(key)
-            if title == "Generation Behavior (normalized mixed-unit view)":
-                values = minmax_normalize(values, invert=(key == "Average Completion Tokens"))
-            if step_mode:
-                ax.step(x, [math.nan if value is None else value for value in values], where="mid", label=key, color=color, linewidth=2)
-                ax.scatter(x, values, color=color, s=25, zorder=3)
-            else:
-                ax.plot(x, values, marker="o", label=key, color=color, linewidth=2)
-        ax.set_ylabel(y_label)
-        ax.set_title(title, fontsize=12, loc="left")
+    for index, (ax, title, series_specs, step_mode, y_label) in enumerate(panel_specs):
+        add_segments(ax, label_position="top" if index == 0 else None)
+        if title == "Generation Length / Reward":
+            left_key, left_color = series_specs[0]
+            right_key, right_color = series_specs[1]
+            left_values = extract_series(left_key)
+            right_values = extract_series(right_key)
+            ax.plot(x, left_values, marker="o", label=left_key, color=left_color, linewidth=2)
+            ax.set_ylabel("tokens", color=left_color)
+            ax.tick_params(axis="y", labelcolor=left_color)
+            right_ax = ax.twinx()
+            right_ax.plot(x, right_values, marker="o", label=right_key, color=right_color, linewidth=2)
+            right_ax.set_ylabel("reward", color=right_color)
+            right_ax.tick_params(axis="y", labelcolor=right_color)
+            right_ax.grid(False)
+            legend_items = [
+                Line2D([0], [0], color=left_color, marker="o", linewidth=2, label=left_key),
+                Line2D([0], [0], color=right_color, marker="o", linewidth=2, label=right_key),
+            ]
+            ax.legend(handles=legend_items, loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, borderaxespad=0.0)
+        elif title == "Checkpointwise Split Transition":
+            train_values = [split_to_y.get(str(row["Train Split"]), math.nan) for row in plot_rows]
+            eval_values = [split_to_y.get(str(row["Eval Split"]), math.nan) for row in plot_rows]
+            ax.step(x, train_values, where="mid", label="train split", color="#1f77b4", linewidth=2.6)
+            ax.plot(x, train_values, marker="o", color="#1f77b4", linewidth=0, markersize=4.8)
+            ax.step(x, eval_values, where="mid", label="eval split", color="#ff7f0e", linewidth=2.0, linestyle="--")
+            ax.plot(
+                x,
+                eval_values,
+                marker="o",
+                color="#ff7f0e",
+                linewidth=0,
+                markersize=4.8,
+                markerfacecolor="white",
+            )
+            ax.set_ylabel("split")
+            ax.set_yticks([0, 1, 2])
+            ax.set_yticklabels(["unknown", "testmini", "test"])
+            ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, borderaxespad=0.0)
+        else:
+            for key, color in series_specs:
+                values = extract_series(key)
+                if step_mode:
+                    ax.step(
+                        x,
+                        [math.nan if value is None else value for value in values],
+                        where="mid",
+                        label=key,
+                        color=color,
+                        linewidth=2,
+                    )
+                    ax.scatter(x, values, color=color, s=25, zorder=3)
+                else:
+                    ax.plot(x, values, marker="o", label=key, color=color, linewidth=2)
+            ax.set_ylabel(y_label)
+            ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, borderaxespad=0.0)
+        title_y = 1.005 if index == 0 else 1.0
+        ax.set_title(title, fontsize=12, loc="left", y=title_y)
         ax.grid(True, axis="y", alpha=0.25)
-        ax.legend(loc="upper left", ncols=3, fontsize=8)
+        if title in {"Reward Weight Evolution", "Reward Weight Evolution continued"}:
+            ax.set_ylim(0.0, 8.01)
+        elif title == "Checkpointwise Split Transition":
+            ax.set_ylim(-0.2, 2.2)
+        elif title == "Exact Match":
+            ax.set_ylim(0.0, 0.8)
+        elif title in {
+            "Reasoning Tag Compliance / Solution Tag Compliance / Truncation Rate",
+            "Generation Diversity / Repetition",
+            "Checkpointwise Stage Relationship / Mix",
+        }:
+            ax.set_ylim(-0.05, 1.05)
+        elif y_label == "rate":
+            ax.set_ylim(-0.05, 1.05)
 
-    decision_ax = axes[4]
-    add_segments(decision_ax)
+    decision_ax = axes[9]
+    add_segments(decision_ax, label_position="bottom")
     y_map = {
         "discard": 0.0,
         "unavailable": 0.2,
@@ -1322,35 +1583,72 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
         "keep": "#2ca02c",
         "keep_primary": "#2ca02c",
     }
+    alias_offsets = {
+        "best_structure": -0.18,
+        "best_correctness": -0.06,
+        "best_composite": 0.06,
+        "latest": 0.18,
+        "none": 0.0,
+    }
     for row in plot_rows:
-        decision_ax.scatter(
-            row["Timeline Order"],
-            y_map.get(row["Keep / Discard"], 0.0),
-            marker=marker_map.get(row["Alias Role"], "o"),
-            color=color_map.get(row["Keep / Discard"], "#333333"),
-            s=180 if row["Keep / Discard"] == "keep_primary" else 110,
-            zorder=3,
-            edgecolor="black",
-            linewidth=0.5,
-        )
+        alias_roles = sorted(filter(None, row.get("Alias Roles", "").split(";"))) or ["none"]
+        for alias in alias_roles:
+            decision_ax.scatter(
+                row["Timeline Order"] + alias_offsets.get(alias, 0.0),
+                y_map.get(row["Keep / Discard"], 0.0),
+                marker=marker_map.get(alias, "o"),
+                color=color_map.get(row["Keep / Discard"], "#333333"),
+                s=180 if row["Keep / Discard"] == "keep_primary" else 110,
+                zorder=3,
+                edgecolor="black",
+                linewidth=0.5,
+            )
     decision_ax.set_yticks([0.0, 0.5, 1.0])
     decision_ax.set_yticklabels(["discard", "reference", "keep"])
     decision_ax.set_ylim(-0.15, 1.2)
     decision_ax.set_title("Checkpoint Decisions / Alias Roles", fontsize=12, loc="left")
     decision_ax.grid(True, axis="y", alpha=0.25)
     decision_ax.set_xticks(x)
-    decision_ax.set_xticklabels(labels, rotation=65, ha="right", fontsize=8)
-    legend_items = [
+    decision_ax.set_xticklabels(x_tick_labels, rotation=60, ha="right", fontsize=8)
+    alias_legend_items = [
         Line2D([0], [0], marker="*", color="w", label="best_composite", markerfacecolor="black", markeredgecolor="black", markersize=12),
         Line2D([0], [0], marker="D", color="w", label="best_correctness", markerfacecolor="black", markeredgecolor="black", markersize=9),
         Line2D([0], [0], marker="s", color="w", label="best_structure", markerfacecolor="black", markeredgecolor="black", markersize=9),
         Line2D([0], [0], marker="o", color="w", label="latest", markerfacecolor="black", markeredgecolor="black", markersize=9),
-        Line2D([0], [0], marker="o", color="w", label="keep", markerfacecolor="#2ca02c", markeredgecolor="black", markersize=9),
+        Line2D([0], [0], marker="P", color="w", label="no alias", markerfacecolor="black", markeredgecolor="black", markersize=9),
+    ]
+    decision_legend_items = [
+        Line2D([0], [0], marker="o", color="w", label="keep_primary", markerfacecolor="#2ca02c", markeredgecolor="black", markersize=9),
+        Line2D([0], [0], marker="o", color="w", label="keep_secondary", markerfacecolor="#1f77b4", markeredgecolor="black", markersize=9),
+        Line2D([0], [0], marker="o", color="w", label="reference", markerfacecolor="#7f7f7f", markeredgecolor="black", markersize=9),
         Line2D([0], [0], marker="o", color="w", label="discard", markerfacecolor="#d62728", markeredgecolor="black", markersize=9),
     ]
-    decision_ax.legend(handles=legend_items, loc="upper left", ncols=3, fontsize=8)
+    alias_legend = decision_ax.legend(
+        handles=alias_legend_items,
+        loc="upper left",
+        bbox_to_anchor=(1.01, 1.0),
+        fontsize=8,
+        borderaxespad=0.0,
+    )
+    decision_ax.add_artist(alias_legend)
+    decision_ax.legend(
+        handles=decision_legend_items,
+        loc="upper left",
+        bbox_to_anchor=(1.01, 0.52),
+        fontsize=8,
+        borderaxespad=0.0,
+    )
 
     fig.suptitle("RL Fine-Tuning Evolution Across Smoke, Large-Split, and Dedicated Phase D Runs", fontsize=16)
+    fig.text(
+        0.5,
+        0.985,
+        "Eval coverage per subset is tiny (2 for smoke runs, 4 for larger runs), so many metrics are strongly quantized.",
+        ha="center",
+        va="top",
+        fontsize=10,
+        color="#555555",
+    )
     fig.savefig(PLOTS_DIR / "evolution_panels.png", dpi=220, bbox_inches="tight")
     fig.savefig(PLOTS_DIR / "evolution_panels.svg", bbox_inches="tight")
     plt.close(fig)
@@ -1879,6 +2177,767 @@ def plot_lineage() -> None:
     plt.close(fig)
 
 
+def draw_curriculum_map_ax(
+    ax: Any,
+    milestone_rows: list[dict[str, Any]],
+    *,
+    title: str = "Curriculum Map",
+    title_size: int = 14,
+    show_note: bool = True,
+) -> None:
+    rows = key_curriculum_rows(milestone_rows)
+    lookup = {row["Milestone ID"]: row for row in rows}
+    ax.axis("off")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+
+    positions = {
+        "baseline_local_snapshot": (0.08, 0.58),
+        "smoke_phase_a_best": (0.22, 0.58),
+        "smoke_phase_b_best": (0.36, 0.58),
+        "smoke_phase_c_best": (0.50, 0.58),
+        "smoke_phase_d_best": (0.50, 0.24),
+        "large_phase_c_best_recommended": (0.68, 0.58),
+        "large_phase_d_same_notebook_best": (0.86, 0.76),
+        "dedicated_phase_d_best": (0.86, 0.38),
+    }
+    edges = [
+        ("baseline_local_snapshot", "smoke_phase_a_best", "staged RL starts"),
+        ("smoke_phase_a_best", "smoke_phase_b_best", "structure improves"),
+        ("smoke_phase_b_best", "smoke_phase_c_best", "precision mix"),
+        ("smoke_phase_c_best", "smoke_phase_d_best", "small-split Stage 3 branch"),
+        ("smoke_phase_c_best", "large_phase_c_best_recommended", "scale up + warm-start ckpt-119"),
+        ("large_phase_c_best_recommended", "large_phase_d_same_notebook_best", "same notebook Phase D"),
+        ("large_phase_c_best_recommended", "dedicated_phase_d_best", "new notebook + warm-start ckpt-120"),
+    ]
+
+    for source_id, target_id, label in edges:
+        source_x, source_y = positions[source_id]
+        target_x, target_y = positions[target_id]
+        ax.annotate(
+            "",
+            xy=(target_x - 0.055, target_y),
+            xytext=(source_x + 0.055, source_y),
+            arrowprops={"arrowstyle": "->", "linewidth": 1.8, "color": "#666666"},
+        )
+        mid_x = (source_x + target_x) / 2
+        mid_y = (source_y + target_y) / 2 + (0.04 if target_y >= source_y else -0.05)
+        ax.text(mid_x, mid_y, label, ha="center", va="center", fontsize=8.5, color="#555555")
+
+    for row in rows:
+        x_pos, y_pos = positions[row["Milestone ID"]]
+        is_primary = row["Milestone ID"] == "large_phase_c_best_recommended"
+        train_eval = f"{SPLIT_DISPLAY.get(row['Train Split'], row['Train Split'])} -> {SPLIT_DISPLAY.get(row['Eval Split'], row['Eval Split'])}"
+        stage_text = compact_stage_mix_text(row["Stage Mix / Curriculum"])
+        if row["Phase"] == "baseline":
+            stage_text = "pre-staged baseline"
+        node_text = "\n".join(
+            [
+                row["Phase Label"],
+                train_eval,
+                stage_text,
+                f"exact {format_float(row['Exact Match'])} | comp {format_float(row['Composite Score'])}",
+            ]
+        )
+        ax.text(
+            x_pos,
+            y_pos,
+            node_text,
+            ha="center",
+            va="center",
+            fontsize=8.8,
+            color="#111111",
+            bbox={
+                "boxstyle": "round,pad=0.45",
+                "facecolor": RUN_FAMILY_COLORS.get(row["Run Family"], "#dddddd"),
+                "edgecolor": "#222222",
+                "alpha": 0.14 if not is_primary else 0.22,
+                "linewidth": 2.2 if is_primary else 1.2,
+            },
+        )
+        if is_primary:
+            ax.text(x_pos, y_pos + 0.15, "recommended final", ha="center", va="bottom", fontsize=8.5, color="#b42318")
+
+    ax.set_title(title, loc="left", fontsize=title_size)
+    if show_note:
+        ax.text(
+            0.0,
+            -0.08,
+            "Main causal story: smoke phases fixed structure on testmini, then larger-split Phase C on test delivered the main correctness gain.",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=9,
+            color="#555555",
+        )
+
+
+def plot_curriculum_map(milestone_rows: list[dict[str, Any]]) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(18, 7))
+    draw_curriculum_map_ax(ax, milestone_rows)
+    save_plot_dual(fig, "curriculum_map")
+    plt.close(fig)
+
+
+def draw_phase_stage_heatmap_ax(
+    ax: Any,
+    milestone_rows: list[dict[str, Any]],
+    *,
+    title: str = "Phase-by-Stage Heatmap",
+    title_size: int = 14,
+    show_note: bool = True,
+) -> None:
+    import numpy as np
+
+    rows = phase_curriculum_rows(milestone_rows)
+    matrix = np.array([stage_mix_vector(row["Stage Mix / Curriculum"]) for row in rows], dtype=float)
+    im = ax.imshow(matrix, aspect="auto", cmap="YlGnBu", vmin=0.0, vmax=1.0)
+    ax.set_xticks(range(len(STAGE_ORDER)))
+    ax.set_xticklabels([STAGE_DISPLAY[stage_name] for stage_name in STAGE_ORDER], fontsize=9)
+    ax.set_yticks(range(len(rows)))
+    ax.set_yticklabels(
+        [f"{row['Phase Label']} | {SPLIT_DISPLAY.get(row['Train Split'], row['Train Split'])}" for row in rows],
+        fontsize=9,
+    )
+    ax.set_title(title, loc="left", fontsize=title_size)
+
+    for row_index, row in enumerate(rows):
+        for col_index, stage_name in enumerate(STAGE_ORDER):
+            value = matrix[row_index, col_index]
+            label = f"{value:.0%}" if value > 0 else "—"
+            text_color = "#111111" if value < 0.65 else "white"
+            ax.text(col_index, row_index, label, ha="center", va="center", fontsize=9, color=text_color, fontweight="bold")
+        ax.text(
+            1.02,
+            row_index,
+            f"eval={SPLIT_DISPLAY.get(row['Eval Split'], row['Eval Split'])}",
+            ha="left",
+            va="center",
+            fontsize=8.5,
+            color="#444444",
+            transform=ax.get_yaxis_transform(),
+        )
+
+    ax.set_xticks([index - 0.5 for index in range(1, len(STAGE_ORDER))], minor=True)
+    ax.set_yticks([index - 0.5 for index in range(1, len(rows))], minor=True)
+    ax.grid(which="minor", color="white", linewidth=1.2)
+    ax.tick_params(which="minor", bottom=False, left=False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    if show_note:
+        ax.text(
+            0.0,
+            -0.16,
+            "Cell value = phase sampling weight for that stage. Baseline is omitted because it had no staged curriculum.",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=9,
+            color="#555555",
+        )
+
+
+def plot_phase_stage_heatmap(milestone_rows: list[dict[str, Any]]) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(11.5, 6.8))
+    draw_phase_stage_heatmap_ax(ax, milestone_rows)
+    save_plot_dual(fig, "phase_stage_heatmap")
+    plt.close(fig)
+
+
+def draw_split_transition_ladder_ax(
+    ax: Any,
+    timeline_rows: list[dict[str, Any]],
+    *,
+    title: str = "Split Transition Ladder",
+    title_size: int = 14,
+    show_note: bool = True,
+) -> None:
+    rows = list(timeline_rows)
+    x_values = [row["Timeline Order"] for row in rows]
+    split_to_y = {"unknown_pre_refactor": 0, "testmini": 1, "test": 2}
+    train_y = [split_to_y.get(row["Train Split"], 0) for row in rows]
+    eval_y = [split_to_y.get(row["Eval Split"], 0) for row in rows]
+
+    ax.axvspan(0.5, 4.5, color="#eef3f9", alpha=0.6, zorder=0)
+    ax.axvspan(4.5, 6.5, color="#fdebec", alpha=0.55, zorder=0)
+    ax.axvspan(6.5, 7.5, color="#edf7f5", alpha=0.65, zorder=0)
+
+    ax.plot(x_values, train_y, color="#1f77b4", linewidth=3, marker="o", markersize=8, label="train split")
+    ax.plot(
+        x_values,
+        eval_y,
+        color="#ff7f0e",
+        linewidth=2.2,
+        linestyle="--",
+        marker="o",
+        markersize=7,
+        markerfacecolor="white",
+        label="eval split",
+    )
+
+    for index, row in enumerate(rows):
+        y_pos = train_y[index]
+        dy = 0.24 if index % 2 == 0 else -0.30
+        ax.text(
+            row["Timeline Order"],
+            y_pos + dy,
+            row["Event Label"],
+            ha="center",
+            va="bottom" if dy > 0 else "top",
+            fontsize=8.8,
+            bbox={"boxstyle": "round,pad=0.22", "facecolor": "white", "edgecolor": "#cccccc", "alpha": 0.95},
+        )
+        if row["Warm Start"]:
+            ax.text(
+                row["Timeline Order"],
+                -0.18,
+                "warm-start" if "/kaggle/input/" in str(row["Warm Start"]) else "resume selector",
+                ha="center",
+                va="top",
+                fontsize=7.8,
+                color="#555555",
+            )
+
+    ax.set_xticks(x_values)
+    ax.set_xticklabels([row["Event Label"] for row in rows], rotation=20, ha="right", fontsize=9)
+    ax.set_yticks([0, 1, 2])
+    ax.set_yticklabels(["unknown", "testmini", "test"])
+    ax.set_ylim(-0.35, 2.35)
+    ax.set_xlim(min(x_values) - 0.4, max(x_values) + 0.4)
+    ax.set_title(title, loc="left", fontsize=title_size)
+    ax.grid(True, axis="y", alpha=0.22)
+    ax.legend(loc="upper left", fontsize=8.5, frameon=False)
+
+    if show_note:
+        ax.text(
+            0.0,
+            -0.24,
+            "The key ladder move is train split testmini -> test at Large Phase C, while checkpoint evaluation stayed on testmini for comparability.",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=9,
+            color="#555555",
+        )
+
+
+def plot_split_transition_ladder(timeline_rows: list[dict[str, Any]]) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(15, 5.8))
+    draw_split_transition_ladder_ax(ax, timeline_rows)
+    save_plot_dual(fig, "split_transition_ladder")
+    plt.close(fig)
+
+
+def draw_milestone_performance_heatmap_ax(
+    ax: Any,
+    milestone_rows: list[dict[str, Any]],
+    *,
+    title: str = "Milestone Performance Table / Heatmap",
+    title_size: int = 14,
+    show_note: bool = True,
+) -> None:
+    import numpy as np
+
+    rows = key_curriculum_rows(milestone_rows)
+    metrics = [
+        ("Exact Match", False, "Exact"),
+        ("Tolerance Accuracy", False, "Tolerance"),
+        ("Parseable Rate", False, "Parseable"),
+        ("Reasoning Tag Compliance", False, "Reasoning"),
+        ("Solution Tag Compliance", False, "Solution"),
+        ("Malformed Rate", True, "Malformed\n(lower better)"),
+        ("Truncation Rate", True, "Truncation\n(lower better)"),
+        ("Composite Score", False, "Composite"),
+    ]
+
+    color_matrix: list[list[float]] = []
+    raw_matrix: list[list[float]] = []
+    for row in rows:
+        color_row = []
+        raw_row = []
+        for key, invert, _label in metrics:
+            raw_value = float(row[key])
+            raw_row.append(raw_value)
+            color_row.append(1.0 - raw_value if invert else raw_value)
+        raw_matrix.append(raw_row)
+        color_matrix.append(color_row)
+
+    matrix = np.array(color_matrix, dtype=float)
+    raw_values = np.array(raw_matrix, dtype=float)
+    ax.imshow(matrix, aspect="auto", cmap="RdYlGn", vmin=0.0, vmax=1.0)
+    ax.set_xticks(range(len(metrics)))
+    ax.set_xticklabels([label for _key, _invert, label in metrics], rotation=20, ha="right", fontsize=9)
+    ax.set_yticks(range(len(rows)))
+    ax.set_yticklabels([row["Phase Label"] for row in rows], fontsize=9)
+    ax.set_title(title, loc="left", fontsize=title_size)
+
+    for row_index, row in enumerate(rows):
+        for col_index, (_key, _invert, _label) in enumerate(metrics):
+            raw_value = raw_values[row_index, col_index]
+            text_color = "#111111" if matrix[row_index, col_index] < 0.64 else "white"
+            ax.text(
+                col_index,
+                row_index,
+                f"{raw_value:.0%}",
+                ha="center",
+                va="center",
+                fontsize=8.8,
+                color=text_color,
+                fontweight="bold" if row["Milestone ID"] == "large_phase_c_best_recommended" else "normal",
+            )
+
+    ax.set_xticks([index - 0.5 for index in range(1, len(metrics))], minor=True)
+    ax.set_yticks([index - 0.5 for index in range(1, len(rows))], minor=True)
+    ax.grid(which="minor", color="white", linewidth=1.2)
+    ax.tick_params(which="minor", bottom=False, left=False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    if show_note:
+        ax.text(
+            0.0,
+            -0.16,
+            "Cell text shows raw values. For color only, malformed and truncation are inverted so greener still means better.",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=9,
+            color="#555555",
+        )
+
+
+def plot_milestone_performance_heatmap(milestone_rows: list[dict[str, Any]]) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(14, 6.8))
+    draw_milestone_performance_heatmap_ax(ax, milestone_rows)
+    save_plot_dual(fig, "milestone_performance_heatmap")
+    plt.close(fig)
+
+
+def _layout_alluvial_column(
+    order: list[str],
+    weights: dict[str, float],
+    scale: float,
+    *,
+    top: float = 0.94,
+    bottom: float = 0.08,
+    gap: float = 0.025,
+) -> dict[str, tuple[float, float]]:
+    used_height = sum(weights[name] for name in order) * scale + max(0, len(order) - 1) * gap
+    y_cursor = top - (top - bottom - used_height) / 2
+    positions: dict[str, tuple[float, float]] = {}
+    for name in order:
+        height = weights[name] * scale
+        positions[name] = (y_cursor - height, y_cursor)
+        y_cursor = y_cursor - height - gap
+    return positions
+
+
+def _draw_alluvial_band(
+    ax: Any,
+    x0: float,
+    x1: float,
+    y0_top: float,
+    y0_bottom: float,
+    y1_top: float,
+    y1_bottom: float,
+    *,
+    color: str,
+    alpha: float = 0.55,
+) -> None:
+    import numpy as np
+
+    t = np.linspace(0.0, 1.0, 60)
+    ease = 3 * t * t - 2 * t * t * t
+    xs = x0 + (x1 - x0) * t
+    top_curve = y0_top + (y1_top - y0_top) * ease
+    bottom_curve = y0_bottom + (y1_bottom - y0_bottom) * ease
+    polygon_x = list(xs) + list(xs[::-1])
+    polygon_y = list(top_curve) + list(bottom_curve[::-1])
+    ax.fill(polygon_x, polygon_y, color=color, alpha=alpha, linewidth=0.0)
+
+
+def draw_curriculum_alluvial_ax(
+    ax: Any,
+    milestone_rows: list[dict[str, Any]],
+    *,
+    title: str = "Curriculum Alluvial Diagram",
+    title_size: int = 14,
+    show_note: bool = True,
+) -> None:
+    from matplotlib.patches import Rectangle
+
+    rows = phase_curriculum_rows(milestone_rows)
+    split_order = ["testmini", "test"]
+    phase_order = [row["Milestone ID"] for row in rows]
+    stage_order = list(STAGE_ORDER)
+
+    split_weights = {split_name: sum(1.0 for row in rows if row["Train Split"] == split_name) for split_name in split_order}
+    phase_weights = {row["Milestone ID"]: 1.0 for row in rows}
+    stage_weights = {stage_name: 0.0 for stage_name in stage_order}
+    for row in rows:
+        mix = parse_stage_mix_text(row["Stage Mix / Curriculum"])
+        for stage_name in stage_order:
+            stage_weights[stage_name] += mix.get(stage_name, 0.0)
+
+    total_weight = float(len(rows))
+    gap = 0.025
+    available = 0.94 - 0.08
+    scale = min(
+        (available - max(0, len(order) - 1) * gap) / total_weight
+        for order in (split_order, phase_order, stage_order)
+    )
+
+    split_positions = _layout_alluvial_column(split_order, split_weights, scale, gap=gap)
+    phase_positions = _layout_alluvial_column(phase_order, phase_weights, scale, gap=gap)
+    stage_positions = _layout_alluvial_column(stage_order, stage_weights, scale, gap=gap)
+
+    ax.axis("off")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+
+    split_x, phase_x, stage_x = 0.12, 0.48, 0.84
+    node_width = 0.10
+
+    split_cursor = {name: split_positions[name][1] for name in split_order}
+    phase_left_cursor = {name: phase_positions[name][1] for name in phase_order}
+    phase_right_cursor = {name: phase_positions[name][1] for name in phase_order}
+    stage_cursor = {name: stage_positions[name][1] for name in stage_order}
+
+    for row in rows:
+        split_name = row["Train Split"]
+        phase_name = row["Milestone ID"]
+        weight = 1.0
+        split_top = split_cursor[split_name]
+        split_bottom = split_top - weight * scale
+        split_cursor[split_name] = split_bottom
+        phase_top = phase_left_cursor[phase_name]
+        phase_bottom = phase_top - weight * scale
+        phase_left_cursor[phase_name] = phase_bottom
+        _draw_alluvial_band(
+            ax,
+            split_x + node_width / 2,
+            phase_x - node_width / 2,
+            split_top,
+            split_bottom,
+            phase_top,
+            phase_bottom,
+            color=RUN_FAMILY_COLORS.get(row["Run Family"], "#999999"),
+            alpha=0.45,
+        )
+
+    for row in rows:
+        phase_name = row["Milestone ID"]
+        mix = parse_stage_mix_text(row["Stage Mix / Curriculum"])
+        for stage_name in stage_order:
+            weight = mix.get(stage_name, 0.0)
+            if weight <= 0:
+                continue
+            phase_top = phase_right_cursor[phase_name]
+            phase_bottom = phase_top - weight * scale
+            phase_right_cursor[phase_name] = phase_bottom
+            stage_top = stage_cursor[stage_name]
+            stage_bottom = stage_top - weight * scale
+            stage_cursor[stage_name] = stage_bottom
+            _draw_alluvial_band(
+                ax,
+                phase_x + node_width / 2,
+                stage_x - node_width / 2,
+                phase_top,
+                phase_bottom,
+                stage_top,
+                stage_bottom,
+                color=STAGE_COLORS[stage_name],
+                alpha=0.58,
+            )
+
+    for split_name in split_order:
+        y0, y1 = split_positions[split_name]
+        ax.add_patch(
+            Rectangle(
+                (split_x - node_width / 2, y0),
+                node_width,
+                y1 - y0,
+                facecolor="#f5f5f5",
+                edgecolor="#333333",
+                linewidth=1.0,
+            )
+        )
+        ax.text(split_x, (y0 + y1) / 2, split_name, ha="center", va="center", fontsize=9, fontweight="bold")
+
+    for row in rows:
+        y0, y1 = phase_positions[row["Milestone ID"]]
+        ax.add_patch(
+            Rectangle(
+                (phase_x - node_width / 2, y0),
+                node_width,
+                y1 - y0,
+                facecolor=RUN_FAMILY_COLORS.get(row["Run Family"], "#dddddd"),
+                edgecolor="#333333",
+                linewidth=1.0,
+                alpha=0.18,
+            )
+        )
+        label = row["Phase Label"].replace("Phase ", "P")
+        ax.text(phase_x, (y0 + y1) / 2, textwrap.fill(label, width=12), ha="center", va="center", fontsize=8.3)
+
+    for stage_name in stage_order:
+        y0, y1 = stage_positions[stage_name]
+        share = stage_weights[stage_name] / total_weight if total_weight else 0.0
+        ax.add_patch(
+            Rectangle(
+                (stage_x - node_width / 2, y0),
+                node_width,
+                y1 - y0,
+                facecolor=STAGE_COLORS[stage_name],
+                edgecolor="#333333",
+                linewidth=1.0,
+                alpha=0.20,
+            )
+        )
+        ax.text(
+            stage_x,
+            (y0 + y1) / 2,
+            f"{STAGE_SHORT[stage_name]}\n{share:.0%}",
+            ha="center",
+            va="center",
+            fontsize=8.4,
+            fontweight="bold",
+        )
+
+    ax.text(split_x, 0.985, "Train Split", ha="center", va="top", fontsize=10, fontweight="bold")
+    ax.text(phase_x, 0.985, "Phase Instance", ha="center", va="top", fontsize=10, fontweight="bold")
+    ax.text(stage_x, 0.985, "Curriculum Stage", ha="center", va="top", fontsize=10, fontweight="bold")
+    ax.set_title(title, loc="left", fontsize=title_size)
+
+    if show_note:
+        ax.text(
+            0.0,
+            -0.08,
+            "Baseline is omitted here. The diagram shows how staged RL phases draw from train splits and fan out into Stage 1/2/3 curriculum weights.",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=9,
+            color="#555555",
+        )
+
+
+def plot_curriculum_alluvial(milestone_rows: list[dict[str, Any]]) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(16, 8))
+    draw_curriculum_alluvial_ax(ax, milestone_rows)
+    save_plot_dual(fig, "curriculum_alluvial")
+    plt.close(fig)
+
+
+def plot_curriculum_overview(milestone_rows: list[dict[str, Any]], timeline_rows: list[dict[str, Any]]) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig = plt.figure(figsize=(20, 17))
+    grid = fig.add_gridspec(3, 2, height_ratios=[1.0, 1.0, 1.15], hspace=0.28, wspace=0.16)
+    ax_map = fig.add_subplot(grid[0, :])
+    ax_heatmap = fig.add_subplot(grid[1, 0])
+    ax_ladder = fig.add_subplot(grid[1, 1])
+    ax_perf = fig.add_subplot(grid[2, :])
+
+    draw_curriculum_map_ax(ax_map, milestone_rows, title="Curriculum Map", title_size=15, show_note=False)
+    draw_phase_stage_heatmap_ax(ax_heatmap, milestone_rows, title="Phase-by-Stage Heatmap", title_size=13, show_note=False)
+    draw_split_transition_ladder_ax(ax_ladder, timeline_rows, title="Split Transition Ladder", title_size=13, show_note=False)
+    draw_milestone_performance_heatmap_ax(
+        ax_perf,
+        milestone_rows,
+        title="Milestone Performance Table / Heatmap",
+        title_size=14,
+        show_note=False,
+    )
+
+    fig.suptitle("Entire RL Curriculum Overview", fontsize=19, fontweight="bold", y=0.995)
+    fig.text(
+        0.5,
+        0.012,
+        "Recommended final checkpoint remains Large Phase C checkpoint-120: structure stayed perfect after the split scale-up and correctness improved from 0.50 to 0.75.",
+        ha="center",
+        va="bottom",
+        fontsize=10,
+        color="#555555",
+    )
+    save_plot_dual(fig, "entire_curriculum_overview")
+    plt.close(fig)
+
+
+def plot_base_vs_final_improvement(all_rows: list[dict[str, Any]]) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    baseline = find_row(all_rows, run_family="baseline_pre_refactor", phase="baseline", global_step=0)
+    final = find_row(all_rows, run_family="large_split_continue", phase="phase_c", global_step=120)
+    if not baseline or not final:
+        raise ValueError("Missing baseline or final checkpoint row for base-vs-final comparison plot.")
+
+    lower_better = {"Malformed Rate", "Truncation Rate", "Repetition Rate", "Average Completion Tokens"}
+    highlighted_metrics = {
+        "Exact Match",
+        "Reasoning Tag Compliance",
+        "Solution Tag Compliance",
+    }
+    metric_groups = [
+        (
+            "Core Accuracy",
+            [
+                "Exact Match",
+                "Tolerance Accuracy",
+            ],
+        ),
+        (
+            "Structure / Completion",
+            [
+                "Parseable Rate",
+                "Reasoning Tag Compliance",
+                "Solution Tag Compliance",
+                "Well-Formed Rate",
+                "Malformed Rate",
+                "Completion Success Rate",
+                "Truncation Rate",
+            ],
+        ),
+        (
+            "Generation",
+            [
+                "Average Completion Tokens",
+                "Repetition Rate",
+                "Sample Diversity",
+            ],
+        ),
+        (
+            "Scores / Reward",
+            [
+                "Average Total Reward",
+                "Structure Score",
+                "Correctness Score",
+                "Composite Score",
+            ],
+        ),
+    ]
+
+    total_rows = sum(len(metrics) + 2 for _, metrics in metric_groups)
+    fig_height = max(12, 0.56 * total_rows + 1.6)
+    fig, ax = plt.subplots(figsize=(12.5, fig_height))
+    fig.subplots_adjust(left=0.035, right=0.965, top=0.955, bottom=0.06)
+    ax.axis("off")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(-0.2, total_rows + 0.35)
+
+    line_color = "#e4e4e4"
+    text_color = "#111111"
+    muted_color = "#555555"
+    pos_color = "#1a7f37"
+    neg_color = "#b42318"
+    neutral_color = "#666666"
+    highlight_fill = "#f3f7ff"
+
+    x_eval = 0.02
+    x_base = 0.48
+    x_trained = 0.67
+    x_improvement = 0.86
+
+    def format_value(metric: str, value: float) -> str:
+        if metric == "Average Completion Tokens":
+            return f"{value:.1f}"
+        if metric == "Average Total Reward":
+            return f"{value:.2f}".rstrip("0").rstrip(".")
+        return f"{value * 100:.1f}%"
+
+    def format_improvement(metric: str, base_value: float, final_value: float) -> tuple[str, str]:
+        if math.isclose(base_value, 0.0):
+            return "—", neutral_color
+        if metric in lower_better:
+            improvement = (base_value - final_value) / base_value * 100.0
+        else:
+            improvement = (final_value - base_value) / base_value * 100.0
+        color = pos_color if improvement > 0 else neg_color if improvement < 0 else neutral_color
+        sign = "+" if improvement > 0 else ""
+        return f"{sign}{improvement:.1f}%", color
+
+    y = total_rows + 0.10
+    for section_title, metrics in metric_groups:
+        y -= 0.65
+        ax.text(x_eval, y, section_title, fontsize=16, ha="left", va="center", color=text_color)
+        y -= 0.55
+        ax.hlines(y, 0.0, 1.0, colors=line_color, linewidth=1.0)
+        y -= 0.48
+        ax.text(x_eval, y, "Eval", fontsize=12, ha="left", va="center", color=text_color, fontweight="bold")
+        ax.text(x_base, y, "Base", fontsize=12, ha="right", va="center", color=text_color, fontweight="bold")
+        ax.text(x_trained, y, "Trained", fontsize=12, ha="right", va="center", color=text_color, fontweight="bold")
+        ax.text(x_improvement, y, "% Improvement", fontsize=12, ha="right", va="center", color=text_color, fontweight="bold")
+        y -= 0.42
+        ax.hlines(y, 0.0, 1.0, colors=line_color, linewidth=1.0)
+
+        for metric in metrics:
+            row_top = y
+            y -= 0.56
+            base_value = float(baseline[metric])
+            final_value = float(final[metric])
+            improvement_text, improvement_color = format_improvement(metric, base_value, final_value)
+            label = f"{metric} (lower better)" if metric in lower_better else metric
+            is_highlighted = metric in highlighted_metrics
+            row_fontweight = "bold" if is_highlighted else "normal"
+
+            if is_highlighted:
+                ax.axhspan(y - 0.43, row_top, xmin=0.0, xmax=1.0, facecolor=highlight_fill, edgecolor="none", zorder=0)
+
+            ax.text(x_eval, y, label, fontsize=11, ha="left", va="center", color=text_color, fontweight=row_fontweight)
+            ax.text(x_base, y, format_value(metric, base_value), fontsize=11, ha="right", va="center", color=text_color, fontweight=row_fontweight)
+            ax.text(x_trained, y, format_value(metric, final_value), fontsize=11, ha="right", va="center", color=text_color, fontweight=row_fontweight)
+            ax.text(x_improvement, y, improvement_text, fontsize=11, ha="right", va="center", color=improvement_color, fontweight="bold")
+
+            y -= 0.43
+            ax.hlines(y, 0.0, 1.0, colors=line_color, linewidth=0.9)
+
+    fig.suptitle("Base vs Trained Improvement", fontsize=24, fontweight="bold", y=0.992)
+    fig.text(
+        0.5,
+        0.016,
+        "Pre-Refactor Baseline (`base`) vs Large Phase C checkpoint-120 (`lgc:c:120`) from master_table_all_checkpoints.",
+        ha="center",
+        va="bottom",
+        fontsize=10,
+        color=muted_color,
+    )
+    fig.savefig(PLOTS_DIR / "base_vs_final_improvement.png", dpi=220, bbox_inches="tight")
+    fig.savefig(PLOTS_DIR / "base_vs_final_improvement.svg", bbox_inches="tight")
+    plt.close(fig)
+
+
 def write_readme(milestones: list[dict[str, Any]], all_rows: list[dict[str, Any]], resource_rows: list[dict[str, Any]]) -> None:
     recommended = next(row for row in milestones if row["Milestone ID"] == "large_phase_c_best_recommended")
     lines = [
@@ -1906,6 +2965,13 @@ def write_readme(milestones: list[dict[str, Any]], all_rows: list[dict[str, Any]
         "",
         "Generated plots:",
         "- `plots/evolution_panels.png`",
+        "- `plots/base_vs_final_improvement.png`",
+        "- `plots/curriculum_map.png`",
+        "- `plots/phase_stage_heatmap.png`",
+        "- `plots/split_transition_ladder.png`",
+        "- `plots/milestone_performance_heatmap.png`",
+        "- `plots/curriculum_alluvial.png`",
+        "- `plots/entire_curriculum_overview.png`",
         "- `plots/runtime_stabilization_timeline.png`",
         "- `plots/checkpoint_frontier_scatter.png`",
         "- `plots/checkpoint_heatmap.png`",
@@ -2053,6 +3119,13 @@ def main() -> None:
     write_table_docs(milestone_rows, all_rows, resource_rows, knob_rows, timeline_rows)
 
     plot_main_evolution(all_rows)
+    plot_base_vs_final_improvement(all_rows)
+    plot_curriculum_map(milestone_rows)
+    plot_phase_stage_heatmap(milestone_rows)
+    plot_split_transition_ladder(timeline_rows)
+    plot_milestone_performance_heatmap(milestone_rows)
+    plot_curriculum_alluvial(milestone_rows)
+    plot_curriculum_overview(milestone_rows, timeline_rows)
     plot_runtime_timeline(timeline_rows)
     plot_frontier(all_rows)
     plot_heatmap(all_rows)

@@ -1,0 +1,492 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\newcommand{\ind}{\mathbf{1}}
+\newcommand{\None}{\mathrm{None}}
+
+\begin{document}
+
+\title{Eval Formula Cheatsheet}
+\author{}
+\date{}
+\maketitle
+
+\section*{Source of Truth}
+\texttt{staged\_rl/parsing.py}, \texttt{staged\_rl/rewarding.py}, \texttt{staged\_rl/evaluation.py}, \texttt{staged\_rl/checkpointing.py}, \texttt{staged\_rl/config.py}
+
+\section*{Notation}
+Let:
+\begin{align*}
+&i = 1,\dots,N && \text{index prompts in the evaluated subset} \\
+&j = 1,\dots,k_i && \text{index sampled completions for prompt } i \\
+&M = \sum_{i=1}^{N} k_i && \text{total number of sampled completions} \\
+&c_{i,j} && \text{completion text} \\
+&g_i && \text{gold answer} \\
+&p_{i,j} && \text{parsed answer} \\
+&L && \texttt{max\_completion\_length} \\
+&\mathrm{tok}_{i,j} && \text{completion token count} \\
+&\ind[\cdot] && \text{indicator function.}
+\end{align*}
+
+\section*{1. Parsing and Match Primitives}
+
+\subsection*{Numeric normalization}
+Define $\mathrm{norm}(x)$ as:
+\begin{itemize}
+\item strip whitespace,
+\item remove commas,
+\item parse as a finite float,
+\item if integer-valued, return the integer string,
+\item otherwise format to 12 significant digits and trim trailing zeros and trailing dot.
+\end{itemize}
+If any step fails, $\mathrm{norm}(x)=\None$.
+
+\subsection*{Exact match}
+For numeric free-form:
+\[
+\mathrm{Exact}_{i,j}
+=
+\ind\!\left[
+\mathrm{norm}(\mathrm{solution\_text}(c_{i,j}))
+=
+\mathrm{norm}(g_i)
+\neq
+\None
+\right].
+\]
+
+For multi-choice:
+\[
+\mathrm{Exact}_{i,j}
+=
+\ind\!\left[
+\mathrm{option\_letter}(c_{i,j}) = \mathrm{gold\_option\_letter}_i
+\right].
+\]
+
+\subsection*{Tolerance match}
+For numeric free-form:
+\[
+\mathrm{Tol}_{i,j}
+=
+\ind\!\left[
+\left|x-y\right|
+\le
+\max\!\left(\mathrm{rel\_tol}\cdot\max(|x|,|y|),\,\mathrm{abs\_tol}\right)
+\right],
+\]
+where $x = \mathrm{float}(\mathrm{solution\_text}(c_{i,j}))$ and $y=\mathrm{float}(g_i)$.
+
+Tolerance values used by eval:
+\[
+(\mathrm{abs\_tol}, \mathrm{rel\_tol}) =
+\begin{cases}
+(10^{-p}, \max(10^{-p}, 10^{-6})) & \text{if precision } p \text{ is provided}, \\
+(10^{-6}, 10^{-6}) & \text{if precision is not provided.}
+\end{cases}
+\]
+
+For multi-choice:
+\[
+\mathrm{Tol}_{i,j} = \mathrm{Exact}_{i,j}.
+\]
+
+\subsection*{Tag compliance}
+\[
+\mathrm{SolutionTag}_{i,j}
+=
+\ind\!\left[
+\#\mathrm{SolutionBlocks}(c_{i,j}) = 1
+\right],
+\]
+\[
+\mathrm{ReasoningTag}_{i,j}
+=
+\ind\!\left[
+\#\mathrm{ReasoningBlocks}(c_{i,j}) = 1
+\right].
+\]
+
+\subsection*{Parseable answer}
+For numeric free-form:
+\[
+\mathrm{Parseable}_{i,j}
+=
+\ind\!\left[
+\mathrm{parse\_numeric\_solution}(c_{i,j}) \neq \None
+\;\wedge\;
+\mathrm{parse\_float\_safe}(\mathrm{parse\_numeric\_solution}(c_{i,j})) \neq \None
+\right].
+\]
+
+For multi-choice:
+\[
+\mathrm{Parseable}_{i,j}
+=
+\ind\!\left[
+\mathrm{option\_letter}(c_{i,j}) \neq \None
+\right].
+\]
+
+\subsection*{Malformed answer}
+For numeric free-form:
+\[
+\mathrm{Malformed}_{i,j}
+=
+\ind\!\left[
+\#\mathrm{SolutionBlocks}(c_{i,j}) \neq 1
+\;\vee\;
+\mathrm{solution\_text}(c_{i,j}) = \varnothing
+\;\vee\;
+\mathrm{parse\_float\_safe}(\mathrm{solution\_text}(c_{i,j})) = \None
+\right].
+\]
+
+For multi-choice:
+\[
+\mathrm{Malformed}_{i,j}
+=
+\ind\!\left[
+\mathrm{option\_letter}(c_{i,j}) = \None
+\right].
+\]
+
+\subsection*{Finished completion}
+For both numeric free-form and multi-choice:
+\[
+\mathrm{Finished}_{i,j}
+=
+\ind\!\left[
+\mathrm{ReasoningTag}_{i,j}=1
+\;\wedge\;
+\mathrm{SolutionTag}_{i,j}=1
+\;\wedge\;
+\mathrm{Malformed}_{i,j}=0
+\right].
+\]
+
+\subsection*{Truncation}
+\[
+\mathrm{Trunc}_{i,j}
+=
+\ind\!\left[
+\mathrm{tok}_{i,j} \ge L
+\;\wedge\;
+\mathrm{Finished}_{i,j}=0
+\right].
+\]
+
+\subsection*{Repetition rate}
+Let $G_{i,j}$ be the multiset of whitespace 3-grams in $c_{i,j}$. Then
+\[
+\mathrm{Rep}_{i,j}
+=
+\begin{cases}
+0, & |G_{i,j}| = 0, \\
+\dfrac{\sum_{g} \max(\mathrm{count}(g)-1,\,0)}{|G_{i,j}|}, & |G_{i,j}| > 0.
+\end{cases}
+\]
+
+\section*{2. Reward Components Logged During Eval}
+These are computed per sampled completion during eval, then averaged into metric outputs.
+
+\subsection*{Format reward}
+\[
+R^{\mathrm{format}}_{i,j}
+=
+1 \cdot \mathrm{ReasoningTag}_{i,j}
++
+1 \cdot \mathrm{SolutionTag}_{i,j}
+-
+0.5 \cdot \mathrm{Malformed}_{i,j}.
+\]
+
+\subsection*{Parseable reward}
+For numeric free-form:
+\[
+R^{\mathrm{parseable}}_{i,j} = \mathrm{Parseable}_{i,j}.
+\]
+
+For multi-choice:
+\[
+R^{\mathrm{parseable}}_{i,j}
+=
+\ind\!\left[
+\mathrm{Malformed}_{i,j}=0
+\right].
+\]
+
+\subsection*{Finished reward}
+\[
+R^{\mathrm{finished}}_{i,j}
+=
+\begin{cases}
+1, & \mathrm{Finished}_{i,j}=1 \;\wedge\; \mathrm{tok}_{i,j}<L, \\
+-1, & \mathrm{tok}_{i,j}\ge L \;\wedge\; \mathrm{Finished}_{i,j}=0, \\
+0, & \text{otherwise.}
+\end{cases}
+\]
+
+\subsection*{Correctness reward}
+\[
+R^{\mathrm{correctness}}_{i,j} = \mathrm{Exact}_{i,j}.
+\]
+
+\subsection*{Brevity reward}
+Let
+\[
+q_{i,j} = \frac{\mathrm{tok}_{i,j}}{\max(L,1)}.
+\]
+Then
+\[
+R^{\mathrm{brevity}}_{i,j}
+=
+\begin{cases}
+-1, & \mathrm{tok}_{i,j} \ge L, \\
+1, & q_{i,j} \le 0.55, \\
+0.5, & 0.55 < q_{i,j} \le 0.75, \\
+0, & 0.75 < q_{i,j} \le 0.90, \\
+-0.5, & 0.90 < q_{i,j} < 1.
+\end{cases}
+\]
+
+\subsection*{Tolerance reward}
+If tolerance reward is disabled for the phase:
+\[
+R^{\mathrm{tolerance}}_{i,j} = 0.
+\]
+
+Otherwise:
+\[
+R^{\mathrm{tolerance}}_{i,j}
+=
+\begin{cases}
+0, & \mathrm{Exact}_{i,j}=1, \\
+1, & \mathrm{Exact}_{i,j}=0 \;\wedge\; \text{numeric tolerance match holds}, \\
+0, & \text{otherwise.}
+\end{cases}
+\]
+
+\subsection*{Total reward}
+For reward components $r$ with weights $w_r$:
+\[
+R^{\mathrm{total}}_{i,j} = \sum_r w_r \, R^r_{i,j}.
+\]
+
+\section*{3. Prompt-Level Eval Metrics}
+
+\subsection*{Best-of-$k$ exact accuracy}
+\[
+\mathrm{BestExact}_i = \max_j \mathrm{Exact}_{i,j}.
+\]
+
+\subsection*{Best-of-$k$ tolerance accuracy}
+\[
+\mathrm{BestTol}_i = \max_j \mathrm{Tol}_{i,j}.
+\]
+
+\subsection*{Sampled answer diversity}
+Let
+\[
+U_i = \{ p_{i,j} : p_{i,j} \neq \None \}.
+\]
+Then
+\[
+\mathrm{Diversity}_i = \frac{|U_i|}{\max(k_i, 1)}.
+\]
+
+\section*{4. Aggregate Eval Metrics Written to \texttt{eval\_metrics.json}}
+Implementation details:
+\begin{itemize}
+\item top-level \texttt{eval\_metrics.json} uses metrics from subset \texttt{eval\_overall\_numeric} when that subset exists,
+\item \texttt{normalized\_exact\_match} and \texttt{tolerance\_accuracy} are computed from the first sampled completion per prompt,
+\item \texttt{sample\_level\_*} metrics average over all sampled completions,
+\item any mean over an empty list is emitted as NaN.
+\end{itemize}
+
+Let sample $j=1$ be the first sample for each prompt.
+
+\subsection*{First-sample prompt metrics}
+\[
+\mathrm{normalized\_exact\_match}
+=
+\frac{1}{N}\sum_{i=1}^{N} \mathrm{Exact}_{i,1}.
+\]
+
+\[
+\mathrm{tolerance\_accuracy}
+=
+\frac{1}{N}\sum_{i=1}^{N} \mathrm{Tol}_{i,1}.
+\]
+
+\[
+\mathrm{best\_of\_k\_accuracy}
+=
+\frac{1}{N}\sum_{i=1}^{N} \mathrm{BestExact}_i.
+\]
+
+\[
+\mathrm{best\_of\_k\_tolerance\_accuracy}
+=
+\frac{1}{N}\sum_{i=1}^{N} \mathrm{BestTol}_i.
+\]
+
+\[
+\mathrm{sampled\_answer\_diversity}
+=
+\frac{1}{N}\sum_{i=1}^{N} \mathrm{Diversity}_i.
+\]
+
+\subsection*{All-sample metrics}
+\[
+\mathrm{parseable\_answer\_rate}
+=
+\frac{1}{M}\sum_{i=1}^{N}\sum_{j=1}^{k_i} \mathrm{Parseable}_{i,j}.
+\]
+
+\[
+\mathrm{malformed\_answer\_rate}
+=
+\frac{1}{M}\sum_{i=1}^{N}\sum_{j=1}^{k_i} \mathrm{Malformed}_{i,j}.
+\]
+
+\[
+\mathrm{reasoning\_tag\_compliance}
+=
+\frac{1}{M}\sum_{i=1}^{N}\sum_{j=1}^{k_i} \mathrm{ReasoningTag}_{i,j}.
+\]
+
+\[
+\mathrm{solution\_tag\_compliance}
+=
+\frac{1}{M}\sum_{i=1}^{N}\sum_{j=1}^{k_i} \mathrm{SolutionTag}_{i,j}.
+\]
+
+\[
+\mathrm{truncation\_rate}
+=
+\frac{1}{M}\sum_{i=1}^{N}\sum_{j=1}^{k_i} \mathrm{Trunc}_{i,j}.
+\]
+
+\[
+\mathrm{average\_completion\_tokens}
+=
+\frac{1}{M}\sum_{i=1}^{N}\sum_{j=1}^{k_i} \mathrm{tok}_{i,j}.
+\]
+
+\[
+\mathrm{repetition\_rate}
+=
+\frac{1}{M}\sum_{i=1}^{N}\sum_{j=1}^{k_i} \mathrm{Rep}_{i,j}.
+\]
+
+\[
+\mathrm{sample\_level\_normalized\_exact\_match}
+=
+\frac{1}{M}\sum_{i=1}^{N}\sum_{j=1}^{k_i} \mathrm{Exact}_{i,j}.
+\]
+
+\[
+\mathrm{sample\_level\_tolerance\_accuracy}
+=
+\frac{1}{M}\sum_{i=1}^{N}\sum_{j=1}^{k_i} \mathrm{Tol}_{i,j}.
+\]
+
+\[
+\mathrm{average\_total\_reward}
+=
+\frac{1}{M}\sum_{i=1}^{N}\sum_{j=1}^{k_i} R^{\mathrm{total}}_{i,j}.
+\]
+
+For each reward component $r$:
+\[
+\mathrm{reward\_component}/r\_\mathrm{mean}
+=
+\frac{1}{M}\sum_{i=1}^{N}\sum_{j=1}^{k_i} R^r_{i,j}.
+\]
+
+\section*{5. Checkpoint Ranking Scores}
+
+\subsection*{Generic weighted score}
+For metric vector $m$ and weight vector $w$:
+\[
+\mathrm{Score}(m,w) = \sum_k w_k m_k.
+\]
+
+\subsection*{Structure score}
+\[
+\mathrm{structure\_score}
+=
+0.35 \cdot \mathrm{parseable\_answer\_rate}
++ 0.20 \cdot \mathrm{solution\_tag\_compliance}
++ 0.20 \cdot \mathrm{reasoning\_tag\_compliance}
+- 0.15 \cdot \mathrm{malformed\_answer\_rate}
+- 0.10 \cdot \mathrm{truncation\_rate}.
+\]
+
+\subsection*{Correctness score}
+\[
+\mathrm{correctness\_score}
+=
+0.70 \cdot \mathrm{normalized\_exact\_match}
++ 0.20 \cdot \mathrm{tolerance\_accuracy}
++ 0.10 \cdot \mathrm{parseable\_answer\_rate}.
+\]
+
+\subsection*{Composite score}
+\[
+\mathrm{composite\_score}
+=
+0.45 \cdot \mathrm{normalized\_exact\_match}
++ 0.15 \cdot \mathrm{tolerance\_accuracy}
++ 0.15 \cdot \mathrm{parseable\_answer\_rate}
++ 0.10 \cdot \mathrm{solution\_tag\_compliance}
++ 0.05 \cdot \mathrm{reasoning\_tag\_compliance}
+- 0.05 \cdot \mathrm{malformed\_answer\_rate}
+- 0.05 \cdot \mathrm{truncation\_rate}.
+\]
+
+\section*{6. Derived Display Metric Used in Results Reporting}
+\[
+\mathrm{completion\_success\_rate}
+=
+1 - \mathrm{truncation\_rate}.
+\]
+
+\section*{7. Failure Mode Labeling}
+Per sample, failure mode is assigned by first match in this order:
+\[
+\mathrm{truncation}
+\;\to\;
+\mathrm{missing\_solution\_tag}
+\;\to\;
+\mathrm{missing\_reasoning\_tag}
+\;\to\;
+\mathrm{malformed\_answer}
+\;\to\;
+\mathrm{unparseable\_answer}
+\;\to\;
+\mathrm{parseable\_but\_wrong}
+\;\to\;
+\mathrm{exact\_match}.
+\]
+
+Equivalent piecewise form:
+\[
+\mathrm{FailureMode}_{i,j}
+=
+\begin{cases}
+\mathrm{truncation}, & \mathrm{Trunc}_{i,j}=1, \\
+\mathrm{missing\_solution\_tag}, & \mathrm{SolutionTag}_{i,j}=0, \\
+\mathrm{missing\_reasoning\_tag}, & \mathrm{ReasoningTag}_{i,j}=0, \\
+\mathrm{malformed\_answer}, & \mathrm{Malformed}_{i,j}=1, \\
+\mathrm{unparseable\_answer}, & \mathrm{Parseable}_{i,j}=0, \\
+\mathrm{parseable\_but\_wrong}, & \mathrm{Exact}_{i,j}=0, \\
+\mathrm{exact\_match}, & \text{otherwise.}
+\end{cases}
+\]
+
+\end{document}

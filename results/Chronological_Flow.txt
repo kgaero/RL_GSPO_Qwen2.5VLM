@@ -1,0 +1,142 @@
+LOCAL MACHINE
+/home/kgaer/code/RL_GSPO_Qwen2.5VLM
+├─ repo source code
+├─ repo launcher notebooks
+│  ├─ kaggle_staged_train.ipynb
+│  ├─ kaggle_staged_train_large_continue.ipynb
+│  └─ kaggle_staged_train_phase_d_from_large_continue.ipynb
+└─ baseline snapshot
+   └─ /home/kgaer/code/RL_GSPO_Qwen2.5VLM/grpo_eval_outputs/eval_metrics.json
+      -> reference only, not part of the staged checkpoint chain
+
+        |
+        | package code snapshot for Kaggle
+        v
+
+KAGGLE DATASET
+"RL GSPO Qwen2.5VLM Staged Code"
+mounted at runtime somewhere under:
+  /kaggle/input/<code-dataset-slug>/
+exact mount path is not hardcoded; notebook discovers it by searching for:
+  rl_gspo_qwen2_5vlm_test3.py
+
+        |
+        | attached to first Kaggle notebook
+        v
+
+KAGGLE NOTEBOOK 1
+Title: RL GSPO Qwen2.5VLM Staged Train
+Repo file: kaggle_staged_train.ipynb
+
+Reads from:
+  /kaggle/input/<code-dataset-slug>/...
+
+Copies code into:
+  /kaggle/working/RL_GSPO_Qwen2.5VLM
+
+Writes outputs to:
+  /kaggle/working/RL_GSPO_Qwen2.5VLM/outputs_staged
+  ├─ phase_a/checkpoint-49
+  ├─ phase_b/checkpoint-60
+  ├─ phase_b/checkpoint-120
+  ├─ phase_b/checkpoint-180
+  ├─ phase_b/checkpoint-240
+  ├─ phase_b/checkpoint-242
+  ├─ phase_c/checkpoint-60
+  ├─ phase_c/checkpoint-119
+  └─ phase_d/checkpoint-30
+
+Important result from Notebook 1:
+  smoke Phase C best checkpoint
+  /kaggle/working/RL_GSPO_Qwen2.5VLM/outputs_staged/phase_c/checkpoint-119
+
+        |
+        | export selected checkpoint as Kaggle dataset
+        v
+
+KAGGLE DATASET
+"RL GSPO Qwen2.5-VLM PhaseC Best Checkpoint"
+
+Known warm-start path used later:
+  /kaggle/input/datasets/mcgmcg1/rl-gspo-qwen2-5vlm-phasec-best-checkpoint/phase_c_best/checkpoint-119
+
+        |
+        | attached to second Kaggle notebook with code dataset
+        v
+
+KAGGLE NOTEBOOK 2
+Title: RL GSPO Qwen2.5VLM Large Split Continue
+Repo file: kaggle_staged_train_large_continue.ipynb
+
+Reads code from:
+  /kaggle/input/<code-dataset-slug>/...
+Reads warm-start checkpoint from:
+  /kaggle/input/datasets/mcgmcg1/rl-gspo-qwen2-5vlm-phasec-best-checkpoint/phase_c_best/checkpoint-119
+
+Copies code into:
+  /kaggle/working/RL_GSPO_Qwen2.5VLM
+
+Writes outputs to:
+  /kaggle/working/RL_GSPO_Qwen2.5VLM/outputs_staged_large_continue
+  ├─ phase_c/checkpoint-60
+  ├─ phase_c/checkpoint-120   <- recommended final checkpoint
+  ├─ phase_c/checkpoint-180
+  ├─ phase_c/checkpoint-240
+  ├─ phase_c/checkpoint-300
+  ├─ phase_c/checkpoint-360
+  ├─ phase_c/checkpoint-420
+  ├─ phase_c/checkpoint-480
+  ├─ phase_c/checkpoint-540
+  ├─ phase_c/checkpoint-600
+  ├─ phase_c/checkpoint-602
+  ├─ phase_d/checkpoint-60
+  ├─ phase_d/checkpoint-120
+  └─ phase_d/checkpoint-130
+
+Important result from Notebook 2:
+  larger-split Phase C best checkpoint
+  /kaggle/working/RL_GSPO_Qwen2.5VLM/outputs_staged_large_continue/phase_c/checkpoint-120
+
+        |
+        | export selected checkpoint as Kaggle dataset
+        v
+
+KAGGLE DATASET
+"RL GSPO Qwen2.5-VLM Large PhaseC Best Checkpoint"
+
+Known warm-start path used later:
+  /kaggle/input/datasets/mcgmcg1/rl-gspo-qwen2-5vlm-large-phasec-best-checkpoint/phase_c_large_best/checkpoint-120
+
+        |
+        | attached to third Kaggle notebook with code dataset
+        v
+
+KAGGLE NOTEBOOK 3
+Title: RL GSPO Qwen2.5VLM Phase D Large Continue
+Repo file: kaggle_staged_train_phase_d_from_large_continue.ipynb
+
+Reads code from:
+  /kaggle/input/<code-dataset-slug>/...
+Reads warm-start checkpoint from:
+  /kaggle/input/datasets/mcgmcg1/rl-gspo-qwen2-5vlm-large-phasec-best-checkpoint/phase_c_large_best/checkpoint-120
+
+Copies code into:
+  /kaggle/working/RL_GSPO_Qwen2.5VLM
+
+Writes outputs to:
+  /kaggle/working/RL_GSPO_Qwen2.5VLM/outputs_staged_phase_d_from_large_phase_c
+  ├─ phase_d/checkpoint-60
+  ├─ phase_d/checkpoint-120
+  └─ phase_d/checkpoint-130
+
+        |
+        | copy/download Kaggle outputs back to local machine for reporting
+        v
+
+LOCAL MACHINE REPORT BUNDLES
+/tmp/rl-gspo-report-smoke/RL_GSPO_Qwen2.5VLM/outputs_staged
+/tmp/rl-gspo-qwen2-5vlm-large-full/RL_GSPO_Qwen2.5VLM/outputs_staged_large_continue
+/tmp/rl-gspo-qwen2-5vlm-phase-d-final/RL_GSPO_Qwen2.5VLM/outputs_staged_phase_d_from_large_phase_c
+
+used to generate:
+  /home/kgaer/code/RL_GSPO_Qwen2.5VLM/results/...
