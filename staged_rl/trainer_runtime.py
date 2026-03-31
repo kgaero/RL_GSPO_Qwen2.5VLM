@@ -390,6 +390,10 @@ class MetricAwareGRPOTrainerMixin:
             max_completion_length=self.reward_runtime.max_completion_length,
         )
         apply_reward_weights(self, self.reward_funcs_list, updated_weights)
+        (checkpoint_dir / "controller_decision.json").write_text(
+            json.dumps(self.reward_controller.latest_decision(), indent=2),
+            encoding="utf-8",
+        )
         (checkpoint_dir / "reward_weights.json").write_text(json.dumps(updated_weights, indent=2), encoding="utf-8")
         (checkpoint_dir / "controller_state.json").write_text(
             json.dumps(self.reward_controller.to_dict(), indent=2),

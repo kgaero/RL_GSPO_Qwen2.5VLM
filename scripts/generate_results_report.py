@@ -17,7 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from staged_rl.config import apply_hardware_profile, build_default_run_config
+from staged_rl.config import RewardGateConfig, apply_hardware_profile, build_default_run_config
+from staged_rl.controller import RewardController
 
 RESULTS_DIR = ROOT / "results"
 TABLES_DIR = RESULTS_DIR / "tables"
@@ -509,6 +510,102 @@ TIMELINE_COLUMN_DESCRIPTIONS = {
     "Interpretation": "Plain-language read of why the milestone matters.",
 }
 
+CONTROLLER_AUDIT_COLUMNS = [
+    "Timeline Order",
+    "X Label",
+    "Run Family",
+    "Run Family Label",
+    "Phase",
+    "Phase Label",
+    "Checkpoint",
+    "Global Step",
+    "Phase Reset",
+    "Parseable Guard Fired",
+    "Format Guard Fired",
+    "Finish Guard Fired",
+    "Correctness Rule Fired",
+    "Stable Structure",
+    "Stable Window Ready",
+    "Correctness Plateau",
+    "Triggered Rules",
+    "Changed Components",
+    "Clamped Components",
+    "Exact Previous",
+    "Exact Current",
+    "Exact Delta",
+    "Parseable Rate",
+    "Solution Tag Compliance",
+    "Reasoning Tag Compliance",
+    "Malformed Rate",
+    "Truncation Rate",
+    "Average Completion Tokens",
+    "Average Token Fraction",
+    "Max Completion Length",
+    "Correctness Before",
+    "Correctness After",
+    "Correctness Delta",
+    "Formatting Before",
+    "Formatting After",
+    "Formatting Delta",
+    "Parseability Before",
+    "Parseability After",
+    "Parseability Delta",
+    "Finished Before",
+    "Finished After",
+    "Finished Delta",
+    "Controller Decision Path",
+    "Controller Decision Source",
+    "Controller Decision Match",
+]
+
+CONTROLLER_AUDIT_COLUMN_DESCRIPTIONS = {
+    "Timeline Order": "Chronological order used in the main checkpoint plots.",
+    "X Label": "Short checkpoint label used in plots.",
+    "Run Family": "Internal run family for the checkpoint.",
+    "Run Family Label": "Human-friendly run family label.",
+    "Phase": "Training phase for the checkpoint.",
+    "Phase Label": "Human-friendly phase label.",
+    "Checkpoint": "Checkpoint directory name.",
+    "Global Step": "Trainer global step at save time.",
+    "Phase Reset": "Whether this row is the first controller update in its phase run.",
+    "Parseable Guard Fired": "Whether the low-parseability guard condition fired.",
+    "Format Guard Fired": "Whether the tag/malformed formatting guard condition fired.",
+    "Finish Guard Fired": "Whether the truncation or overlength guard condition fired.",
+    "Correctness Rule Fired": "Whether correctness weight escalation fired after a stable plateau.",
+    "Stable Structure": "Whether all structure stability thresholds were satisfied.",
+    "Stable Window Ready": "Whether enough checkpoint history existed to test the correctness plateau rule.",
+    "Correctness Plateau": "Whether exact-match gain stayed below the plateau threshold over the stable window.",
+    "Triggered Rules": "Semicolon-separated list of controller rules that fired on this checkpoint.",
+    "Changed Components": "Semicolon-separated list of reward weights that actually changed.",
+    "Clamped Components": "Semicolon-separated list of weights clipped by min/max bounds.",
+    "Exact Previous": "Previous exact-match value used by the plateau rule.",
+    "Exact Current": "Current exact-match value seen by the controller.",
+    "Exact Delta": "Current exact minus previous exact used by the plateau rule.",
+    "Parseable Rate": "Current parseable-answer rate seen by the controller.",
+    "Solution Tag Compliance": "Current solution-tag compliance seen by the controller.",
+    "Reasoning Tag Compliance": "Current reasoning-tag compliance seen by the controller.",
+    "Malformed Rate": "Current malformed-answer rate seen by the controller.",
+    "Truncation Rate": "Current truncation rate seen by the controller.",
+    "Average Completion Tokens": "Current average completion length seen by the controller.",
+    "Average Token Fraction": "Average completion tokens divided by max completion length.",
+    "Max Completion Length": "Max completion length used for the controller decision.",
+    "Correctness Before": "Correctness weight before the controller update.",
+    "Correctness After": "Correctness weight after the controller update.",
+    "Correctness Delta": "Change applied to correctness weight on this checkpoint.",
+    "Formatting Before": "Formatting weight before the controller update.",
+    "Formatting After": "Formatting weight after the controller update.",
+    "Formatting Delta": "Change applied to formatting weight on this checkpoint.",
+    "Parseability Before": "Parseability weight before the controller update.",
+    "Parseability After": "Parseability weight after the controller update.",
+    "Parseability Delta": "Change applied to parseability weight on this checkpoint.",
+    "Finished Before": "Finished-answer weight before the controller update.",
+    "Finished After": "Finished-answer weight after the controller update.",
+    "Finished Delta": "Change applied to finished-answer weight on this checkpoint.",
+    "Controller Decision Path": "Path to the saved per-checkpoint controller decision artifact when present.",
+    "Controller Decision Source": "Whether the audit row came from a saved artifact or report-side reconstruction.",
+    "Controller Decision Match": "Whether the reconstructed post-update weights matched the saved checkpoint weights.",
+}
+
 
 def ensure_dirs() -> None:
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
@@ -947,6 +1044,176 @@ def collect_baseline_row() -> dict[str, Any]:
     return row
 
 
+def _default_run_config_dict(phase_name: str) -> dict[str, Any]:
+    return asdict(build_default_run_config(phase_name))
+
+
+def _build_controller_from_run_config(run_config_data: dict[str, Any], phase_name: str) -> RewardController:
+    phases = run_config_data.get("phases", {})
+    phase_cfg = phases.get(phase_name) or _default_run_config_dict(phase_name)["phases"][phase_name]
+    reward_gate_data = run_config_data.get("reward_gate") or _default_run_config_dict(phase_name)["reward_gate"]
+    reward_components = phase_cfg.get("reward_components", {})
+    component_bounds = {
+        name: (float(component["min_weight"]), float(component["max_weight"]))
+        for name, component in reward_components.items()
+    }
+    initial_weights = {
+        name: float(component["initial_weight"]) if component.get("enabled", True) else 0.0
+        for name, component in reward_components.items()
+    }
+    return RewardController(
+        gate_config=RewardGateConfig(**reward_gate_data),
+        component_bounds=component_bounds,
+        initial_weights=initial_weights,
+    )
+
+
+def _controller_metric_payload(row: dict[str, Any]) -> dict[str, float]:
+    return {
+        "parseable_answer_rate": float(row.get("Parseable Rate") or 0.0),
+        "solution_tag_compliance": float(row.get("Solution Tag Compliance") or 0.0),
+        "reasoning_tag_compliance": float(row.get("Reasoning Tag Compliance") or 0.0),
+        "malformed_answer_rate": float(row.get("Malformed Rate") or 0.0),
+        "truncation_rate": float(row.get("Truncation Rate") or 0.0),
+        "average_completion_tokens": float(row.get("Average Completion Tokens") or 0.0),
+        "normalized_exact_match": float(row.get("Exact Match") or 0.0),
+    }
+
+
+def _checkpoint_weight_snapshot(row: dict[str, Any]) -> dict[str, float]:
+    return {
+        "correctness_reward": float(row.get("Correctness Weight") or 0.0),
+        "format_reward": float(row.get("Formatting Weight") or 0.0),
+        "parseable_reward": float(row.get("Parseability Weight") or 0.0),
+        "finished_reward": float(row.get("Finished Weight") or 0.0),
+        "tolerance_reward": float(row.get("Tolerance Weight") or 0.0),
+        "brevity_reward": float(row.get("Brevity Weight") or 0.0),
+    }
+
+
+def _weights_match(left: dict[str, Any], right: dict[str, Any], tolerance: float = 1e-9) -> bool:
+    if not left or not right:
+        return False
+    for name, value in right.items():
+        if name not in left:
+            return False
+        if not math.isclose(float(left[name]), float(value), abs_tol=tolerance, rel_tol=tolerance):
+            return False
+    return True
+
+
+def build_controller_audit_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    audit_rows = []
+    grouped_rows: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        if row.get("Artifact Status") != "actual_checkpoint" or row.get("Phase") == "baseline":
+            continue
+        grouped_rows[(row["Run Family"], row["Phase"])].append(row)
+
+    for (_, phase_name), phase_rows in grouped_rows.items():
+        phase_rows.sort(key=lambda item: int(item["Global Step"]))
+        run_config_data = json_load(Path(phase_rows[0]["Run Config Path"])) or _default_run_config_dict(phase_name)
+        controller = _build_controller_from_run_config(run_config_data, phase_name)
+
+        for row in phase_rows:
+            max_completion_length = int(row.get("max_completion_length") or 0)
+            controller.update_from_metrics(
+                _controller_metric_payload(row),
+                max_completion_length=max_completion_length,
+            )
+            reconstructed_decision = controller.latest_decision()
+            decision_path = Path(row["Checkpoint Path Abs"]) / "controller_decision.json"
+            saved_decision = json_load(decision_path)
+            decision = (
+                saved_decision
+                if saved_decision.get("post_update_weights") and saved_decision.get("weight_deltas")
+                else reconstructed_decision
+            )
+            decision_source = "artifact" if decision is saved_decision else "reconstructed"
+            weights = decision.get("weight_deltas", {})
+            rule_status = decision.get("rule_status", {})
+            checkpoint_weights = _checkpoint_weight_snapshot(row)
+            post_update_weights = decision.get("post_update_weights", {})
+            triggered_rules = [event["rule_key"] for event in decision.get("rule_events", [])]
+            changed_components = decision.get("changed_components", [])
+            clamped_components = [
+                item["component"] if isinstance(item, dict) else str(item)
+                for item in decision.get("clamped_components", [])
+            ]
+
+            audit_rows.append(
+                {
+                    "Timeline Order": row["Timeline Order"],
+                    "X Label": row["X Label"],
+                    "Run Family": row["Run Family"],
+                    "Run Family Label": row["Run Family Label"],
+                    "Phase": row["Phase"],
+                    "Phase Label": row["Phase Label"],
+                    "Checkpoint": row["Checkpoint"],
+                    "Global Step": row["Global Step"],
+                    "Phase Reset": bool(decision.get("history_length_before", 0) == 0),
+                    "Parseable Guard Fired": bool(rule_status.get("parseable_guard", False)),
+                    "Format Guard Fired": bool(rule_status.get("format_guard", False)),
+                    "Finish Guard Fired": bool(rule_status.get("finish_guard", False)),
+                    "Correctness Rule Fired": bool(rule_status.get("correctness_escalation", False)),
+                    "Stable Structure": bool(rule_status.get("stable_structure", False)),
+                    "Stable Window Ready": bool(rule_status.get("stable_window_ready", False)),
+                    "Correctness Plateau": bool(rule_status.get("correctness_plateau", False)),
+                    "Triggered Rules": ";".join(triggered_rules),
+                    "Changed Components": ";".join(changed_components),
+                    "Clamped Components": ";".join(clamped_components),
+                    "Exact Previous": decision.get("exact_previous", ""),
+                    "Exact Current": decision.get("exact_current", ""),
+                    "Exact Delta": decision.get("exact_delta", ""),
+                    "Parseable Rate": row.get("Parseable Rate", ""),
+                    "Solution Tag Compliance": row.get("Solution Tag Compliance", ""),
+                    "Reasoning Tag Compliance": row.get("Reasoning Tag Compliance", ""),
+                    "Malformed Rate": row.get("Malformed Rate", ""),
+                    "Truncation Rate": row.get("Truncation Rate", ""),
+                    "Average Completion Tokens": row.get("Average Completion Tokens", ""),
+                    "Average Token Fraction": decision.get("avg_token_fraction", ""),
+                    "Max Completion Length": max_completion_length,
+                    "Correctness Before": weights.get("correctness_reward", {}).get("before", ""),
+                    "Correctness After": weights.get("correctness_reward", {}).get("after", ""),
+                    "Correctness Delta": weights.get("correctness_reward", {}).get("delta", ""),
+                    "Formatting Before": weights.get("format_reward", {}).get("before", ""),
+                    "Formatting After": weights.get("format_reward", {}).get("after", ""),
+                    "Formatting Delta": weights.get("format_reward", {}).get("delta", ""),
+                    "Parseability Before": weights.get("parseable_reward", {}).get("before", ""),
+                    "Parseability After": weights.get("parseable_reward", {}).get("after", ""),
+                    "Parseability Delta": weights.get("parseable_reward", {}).get("delta", ""),
+                    "Finished Before": weights.get("finished_reward", {}).get("before", ""),
+                    "Finished After": weights.get("finished_reward", {}).get("after", ""),
+                    "Finished Delta": weights.get("finished_reward", {}).get("delta", ""),
+                    "Controller Decision Path": maybe_path(decision_path),
+                    "Controller Decision Source": decision_source,
+                    "Controller Decision Match": _weights_match(post_update_weights, checkpoint_weights),
+                }
+            )
+
+    audit_rows.sort(key=lambda item: int(item["Timeline Order"]))
+    return audit_rows
+
+
+def analysis_for_controller_audit(rows: list[dict[str, Any]]) -> list[str]:
+    parse_hits = sum(bool(row["Parseable Guard Fired"]) for row in rows)
+    format_hits = sum(bool(row["Format Guard Fired"]) for row in rows)
+    finish_hits = sum(bool(row["Finish Guard Fired"]) for row in rows)
+    correctness_hits = sum(bool(row["Correctness Rule Fired"]) for row in rows)
+    resets = sum(bool(row["Phase Reset"]) for row in rows)
+    regressive_correctness_hits = sum(
+        bool(row["Correctness Rule Fired"]) and isinstance(row.get("Exact Delta"), (int, float)) and float(row["Exact Delta"]) < 0.0
+        for row in rows
+    )
+    return [
+        f"The controller audit covers {len(rows)} evaluated checkpoints across {resets} phase resets.",
+        f"Parseability guard fired {parse_hits} times, format guard fired {format_hits} times, and finish guard fired {finish_hits} times.",
+        f"Correctness escalation fired {correctness_hits} times after structure was already stable.",
+        f"{regressive_correctness_hits} correctness escalations happened on checkpoints where exact match had actually regressed, which makes the plateau rule's behavior explicit.",
+        "The audit rows distinguish phase-default resets from controller-triggered updates, which the weight-evolution plot alone does not show.",
+    ]
+
+
 def build_all_checkpoint_rows() -> list[dict[str, Any]]:
     rows = [collect_baseline_row()]
     for source in RUN_SOURCES:
@@ -1304,7 +1571,12 @@ def save_plot_dual(fig: Any, stem: str) -> None:
     fig.savefig(PLOTS_DIR / f"{stem}.svg", bbox_inches="tight")
 
 
-def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
+def plot_main_evolution(
+    rows: list[dict[str, Any]],
+    *,
+    stem: str = "evolution_panels",
+    include_notebook_panel: bool = False,
+) -> None:
     import matplotlib
 
     matplotlib.use("Agg")
@@ -1322,6 +1594,9 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
         plot_labels.append(f"{run_family_plot_code(row['Run Family'])}:{phase_short}:{row['Global Step']}")
 
     x_tick_labels = list(plot_labels)
+    notebook_order = list(dict.fromkeys(row["Notebook / Run Slug"] for row in plot_rows))
+    notebook_to_y = {label: index for index, label in enumerate(notebook_order)}
+    notebook_y = [notebook_to_y[row["Notebook / Run Slug"]] for row in plot_rows]
 
     split_to_y = {"unknown_pre_refactor": 0, "testmini": 1, "test": 2}
     stage_series_lookup = {
@@ -1338,12 +1613,74 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
         stage_series_lookup["Stage 2 (Medium/Float)"].append(mix_values[1])
         stage_series_lookup["Stage 3 (Hard Numeric)"].append(mix_values[2])
 
+    audit_lookup = {row["X Label"]: row for row in build_controller_audit_rows(rows)}
+    rule_heatmap_specs = [
+        ("Phase Reset", "reset"),
+        ("Parseable Guard Fired", "parse"),
+        ("Format Guard Fired", "format"),
+        ("Finish Guard Fired", "finish"),
+        ("Stable Structure", "stable"),
+        ("Stable Window Ready", "window"),
+        ("Correctness Plateau", "plateau"),
+        ("Correctness Rule Fired", "correct"),
+    ]
+    rule_marker_specs = {
+        "Phase Reset": {"marker": "P", "color": "#bcbd22", "size": 110},
+        "Parseable Guard Fired": {"marker": "s", "color": "#1f77b4", "size": 95},
+        "Format Guard Fired": {"marker": "D", "color": "#2ca02c", "size": 95},
+        "Finish Guard Fired": {"marker": "^", "color": "#9467bd", "size": 95},
+        "Stable Structure": {"marker": "o", "color": "#7f7f7f", "size": 90},
+        "Stable Window Ready": {"marker": "v", "color": "#17becf", "size": 95},
+        "Correctness Plateau": {"marker": "X", "color": "#ff7f0e", "size": 100},
+        "Correctness Rule Fired": {"marker": "*", "color": "#d62728", "size": 160},
+    }
+    delta_heatmap_specs = [
+        ("Correctness Delta", "Correctness Weight"),
+        ("Parseability Delta", "Parseability Weight"),
+        ("Finished Delta", "Finished Weight"),
+        ("Formatting Delta", "Formatting Weight"),
+    ]
+    reset_value_specs = [
+        ("Configured Initial Correctness Weight", "Correctness Weight"),
+        ("Configured Initial Parseability Weight", "Parseability Weight"),
+        ("Configured Initial Finished Weight", "Finished Weight"),
+        ("Configured Initial Tolerance Weight", "Tolerance Weight"),
+        ("Configured Initial Brevity Weight", "Brevity Weight"),
+        ("Configured Initial Formatting Weight", "Formatting Weight"),
+    ]
+    delta_marker_style = {
+        "positive_fill": "#cfe8dc",
+        "negative_fill": "#f4dddd",
+        "edge": "#6f6f6f",
+        "boxstyle": "square,pad=0.18",
+        "alpha": 0.98,
+        "fontsize": 6.8,
+    }
+    reset_marker_style = {
+        "fill": "#dbe9f6",
+        "edge": "#6f6f6f",
+        "boxstyle": "square,pad=0.18",
+        "alpha": 0.98,
+        "fontsize": 6.8,
+    }
+    height_ratios = [1.0, 1.0, 0.9, 1.0, 1.0, 0.95, 0.9, 0.95, 1.25, 0.75, 0.85, 0.9, 0.65]
+    if include_notebook_panel:
+        height_ratios.append(0.95)
+
+    def wrap_axis_label(label: str, width: int = 18) -> str:
+        wrap_ready = label.replace("/", "/ ").replace("_", "_ ")
+        wrapped = textwrap.fill(wrap_ready, width=width, break_long_words=False, break_on_hyphens=True)
+        return wrapped.replace("/ ", "/").replace("_ ", "_")
+
     fig, axes = plt.subplots(
-        10,
+        14 if include_notebook_panel else 13,
         1,
-        figsize=(22, 33),
+        figsize=(22, 46 if include_notebook_panel else 43),
         sharex=True,
-        gridspec_kw={"height_ratios": [1.0, 1.0, 0.9, 1.0, 1.0, 1.25, 0.75, 0.85, 0.9, 0.65], "hspace": 0.10},
+        gridspec_kw={
+            "height_ratios": height_ratios,
+            "hspace": 0.10,
+        },
     )
     fig.subplots_adjust(right=0.84)
 
@@ -1444,6 +1781,27 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
         ),
         (
             axes[5],
+            "Rule Triggers",
+            [],
+            False,
+            "rule",
+        ),
+        (
+            axes[6],
+            "Weight Deltas - controller applied",
+            [],
+            False,
+            "delta",
+        ),
+        (
+            axes[7],
+            "Weight Reset - phase initial default",
+            [],
+            False,
+            "reset",
+        ),
+        (
+            axes[8],
             "Reward Weight Evolution",
             [
                 ("Correctness Weight", "#d62728"),
@@ -1456,7 +1814,7 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
             "weight",
         ),
         (
-            axes[6],
+            axes[9],
             "Reward Weight Evolution continued",
             [
                 ("Formatting Weight", "#1f77b4"),
@@ -1465,14 +1823,14 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
             "weight",
         ),
         (
-            axes[7],
+            axes[10],
             "Checkpointwise Split Transition",
             [],
             False,
             "split",
         ),
         (
-            axes[8],
+            axes[11],
             "Checkpointwise Stage Relationship / Mix",
             [
                 ("Stage 1 (Easy Numeric)", STAGE_COLORS["stage1_easy_numeric"]),
@@ -1504,6 +1862,125 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
                 Line2D([0], [0], color=right_color, marker="o", linewidth=2, label=right_key),
             ]
             ax.legend(handles=legend_items, loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, borderaxespad=0.0)
+        elif title == "Rule Triggers":
+            ax.set_ylabel("rule")
+            ax.set_yticks(range(len(rule_heatmap_specs)))
+            ax.set_yticklabels([label for _, label in rule_heatmap_specs], fontsize=8)
+            ax.set_ylim(-0.5, len(rule_heatmap_specs) - 0.5)
+            ax.invert_yaxis()
+            for row in plot_rows:
+                audit_row = audit_lookup.get(row["X Label"])
+                if audit_row is None:
+                    continue
+                x_pos = row["Timeline Order"]
+                for trigger_index, (column_name, _) in enumerate(rule_heatmap_specs):
+                    if bool(audit_row.get(column_name)):
+                        marker_cfg = rule_marker_specs[column_name]
+                        ax.scatter(
+                            x_pos,
+                            trigger_index,
+                            marker=marker_cfg["marker"],
+                            color=marker_cfg["color"],
+                            s=marker_cfg["size"],
+                            zorder=3,
+                            edgecolor="black",
+                            linewidth=0.5,
+                        )
+            rule_legend_items = [
+                Line2D(
+                    [0],
+                    [0],
+                    marker=rule_marker_specs[column_name]["marker"],
+                    color="w",
+                    label=label,
+                    markerfacecolor=rule_marker_specs[column_name]["color"],
+                    markeredgecolor="black",
+                    markersize=9 if rule_marker_specs[column_name]["size"] < 140 else 12,
+                )
+                for column_name, label in rule_heatmap_specs
+            ]
+            ax.legend(
+                handles=rule_legend_items,
+                loc="upper left",
+                bbox_to_anchor=(1.01, 1.0),
+                fontsize=7.5,
+                borderaxespad=0.0,
+            )
+        elif title == "Weight Deltas - controller applied":
+            ax.set_ylabel("")
+            ax.set_yticks(range(len(delta_heatmap_specs)))
+            ax.set_yticklabels([label for _, label in delta_heatmap_specs], fontsize=8)
+            ax.yaxis.tick_right()
+            ax.yaxis.set_label_position("right")
+            ax.tick_params(axis="y", labelright=True, labelleft=False, pad=8)
+            ax.set_ylim(-0.5, len(delta_heatmap_specs) - 0.5)
+            ax.invert_yaxis()
+            for delta_index in range(len(delta_heatmap_specs)):
+                ax.axhline(delta_index, color="#d7d7d7", linewidth=0.8, zorder=1)
+            for row in plot_rows:
+                audit_row = audit_lookup.get(row["X Label"])
+                if audit_row is None:
+                    continue
+                x_pos = row["Timeline Order"]
+                for delta_index, (column_name, _) in enumerate(delta_heatmap_specs):
+                    value = audit_row.get(column_name)
+                    if isinstance(value, (int, float)) and abs(float(value)) > 1e-9:
+                        marker_color = delta_marker_style["positive_fill"] if float(value) > 0 else delta_marker_style["negative_fill"]
+                        label = f"{float(value):+.2f}".rstrip("0").rstrip(".")
+                        ax.text(
+                            x_pos,
+                            delta_index,
+                            label,
+                            ha="center",
+                            va="center",
+                            color="black",
+                            fontsize=delta_marker_style["fontsize"],
+                            zorder=4,
+                            bbox={
+                                "boxstyle": delta_marker_style["boxstyle"],
+                                "facecolor": marker_color,
+                                "edgecolor": delta_marker_style["edge"],
+                                "linewidth": 0.9,
+                                "alpha": delta_marker_style["alpha"],
+                            },
+                        )
+        elif title == "Weight Reset - phase initial default":
+            ax.set_ylabel("")
+            ax.set_yticks(range(len(reset_value_specs)))
+            ax.set_yticklabels([label for _, label in reset_value_specs], fontsize=8)
+            ax.yaxis.tick_right()
+            ax.yaxis.set_label_position("right")
+            ax.tick_params(axis="y", labelright=True, labelleft=False, pad=8)
+            ax.set_ylim(-0.5, len(reset_value_specs) - 0.5)
+            ax.invert_yaxis()
+            for reset_index in range(len(reset_value_specs)):
+                ax.axhline(reset_index, color="#d7d7d7", linewidth=0.8, zorder=1)
+            for row in plot_rows:
+                audit_row = audit_lookup.get(row["X Label"])
+                if audit_row is None or not bool(audit_row.get("Phase Reset")):
+                    continue
+                x_pos = row["Timeline Order"]
+                for reset_index, (column_name, _) in enumerate(reset_value_specs):
+                    value = row.get(column_name)
+                    if isinstance(value, (int, float)):
+                        label = f"{float(value):.2f}".rstrip("0").rstrip(".")
+                        ax.text(
+                            x_pos,
+                            reset_index,
+                            label,
+                            ha="center",
+                            va="center",
+                            color="black",
+                            fontsize=reset_marker_style["fontsize"],
+                            zorder=4,
+                            bbox={
+                                "boxstyle": reset_marker_style["boxstyle"],
+                                "facecolor": reset_marker_style["fill"],
+                                "edgecolor": reset_marker_style["edge"],
+                                "linewidth": 0.9,
+                                "alpha": reset_marker_style["alpha"],
+                            },
+                        )
         elif title == "Checkpointwise Split Transition":
             train_values = [split_to_y.get(str(row["Train Split"]), math.nan) for row in plot_rows]
             eval_values = [split_to_y.get(str(row["Eval Split"]), math.nan) for row in plot_rows]
@@ -1539,7 +2016,8 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
                 else:
                     ax.plot(x, values, marker="o", label=key, color=color, linewidth=2)
             ax.set_ylabel(y_label)
-            ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, borderaxespad=0.0)
+            if series_specs:
+                ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, borderaxespad=0.0)
         title_y = 1.005 if index == 0 else 1.0
         ax.set_title(title, fontsize=12, loc="left", y=title_y)
         ax.grid(True, axis="y", alpha=0.25)
@@ -1558,8 +2036,8 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
         elif y_label == "rate":
             ax.set_ylim(-0.05, 1.05)
 
-    decision_ax = axes[9]
-    add_segments(decision_ax, label_position="bottom")
+    decision_ax = axes[12]
+    add_segments(decision_ax, label_position=None if include_notebook_panel else "bottom")
     y_map = {
         "discard": 0.0,
         "unavailable": 0.2,
@@ -1608,8 +2086,11 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
     decision_ax.set_ylim(-0.15, 1.2)
     decision_ax.set_title("Checkpoint Decisions / Alias Roles", fontsize=12, loc="left")
     decision_ax.grid(True, axis="y", alpha=0.25)
-    decision_ax.set_xticks(x)
-    decision_ax.set_xticklabels(x_tick_labels, rotation=60, ha="right", fontsize=8)
+    if include_notebook_panel:
+        decision_ax.tick_params(axis="x", labelbottom=False)
+    else:
+        decision_ax.set_xticks(x)
+        decision_ax.set_xticklabels(x_tick_labels, rotation=60, ha="right", fontsize=8)
     alias_legend_items = [
         Line2D([0], [0], marker="*", color="w", label="best_composite", markerfacecolor="black", markeredgecolor="black", markersize=12),
         Line2D([0], [0], marker="D", color="w", label="best_correctness", markerfacecolor="black", markeredgecolor="black", markersize=9),
@@ -1639,6 +2120,37 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
         borderaxespad=0.0,
     )
 
+    if include_notebook_panel:
+        notebook_ax = axes[13]
+        add_segments(notebook_ax, label_position="bottom")
+        for notebook_index in range(len(notebook_order)):
+            notebook_ax.axhline(notebook_index, color="#d7d7d7", linewidth=0.8, zorder=1)
+        notebook_ax.step(x, notebook_y, where="mid", color="#6f6f6f", linewidth=1.8, zorder=2)
+        notebook_ax.scatter(
+            x,
+            notebook_y,
+            c=[RUN_FAMILY_COLORS.get(row["Run Family"], "#333333") for row in plot_rows],
+            s=58,
+            zorder=3,
+            edgecolor="black",
+            linewidth=0.5,
+        )
+        notebook_ax.set_ylabel("")
+        notebook_ax.set_yticks(range(len(notebook_order)))
+        notebook_ax.set_yticklabels([wrap_axis_label(label, width=18) for label in notebook_order], fontsize=7)
+        notebook_ax.yaxis.tick_right()
+        notebook_ax.yaxis.set_label_position("right")
+        notebook_ax.tick_params(axis="y", labelright=True, labelleft=False, pad=8)
+        for tick_label in notebook_ax.get_yticklabels():
+            tick_label.set_horizontalalignment("left")
+            tick_label.set_linespacing(0.9)
+        notebook_ax.set_ylim(-0.5, len(notebook_order) - 0.5)
+        notebook_ax.invert_yaxis()
+        notebook_ax.set_title("Notebook Evolution", fontsize=12, loc="left")
+        notebook_ax.grid(False, axis="y")
+        notebook_ax.set_xticks(x)
+        notebook_ax.set_xticklabels(x_tick_labels, rotation=60, ha="right", fontsize=8)
+
     fig.suptitle("RL Fine-Tuning Evolution Across Smoke, Large-Split, and Dedicated Phase D Runs", fontsize=16)
     fig.text(
         0.5,
@@ -1649,8 +2161,7 @@ def plot_main_evolution(rows: list[dict[str, Any]]) -> None:
         fontsize=10,
         color="#555555",
     )
-    fig.savefig(PLOTS_DIR / "evolution_panels.png", dpi=220, bbox_inches="tight")
-    fig.savefig(PLOTS_DIR / "evolution_panels.svg", bbox_inches="tight")
+    save_plot_dual(fig, stem)
     plt.close(fig)
 
 
@@ -2138,6 +2649,81 @@ def plot_heatmap(all_rows: list[dict[str, Any]]) -> None:
     fig.colorbar(im, ax=ax, fraction=0.025, pad=0.02)
     fig.savefig(PLOTS_DIR / "checkpoint_heatmap.png", dpi=220, bbox_inches="tight")
     fig.savefig(PLOTS_DIR / "checkpoint_heatmap.svg", bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_controller_rule_heatmap(audit_rows: list[dict[str, Any]]) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    if not audit_rows:
+        return
+
+    plot_rows = sorted(audit_rows, key=lambda item: int(item["Timeline Order"]))
+    row_labels = [row["X Label"] for row in plot_rows]
+    rule_columns = [
+        ("Phase Reset", "reset"),
+        ("Parseable Guard Fired", "parse"),
+        ("Format Guard Fired", "format"),
+        ("Finish Guard Fired", "finish"),
+        ("Stable Structure", "stable"),
+        ("Stable Window Ready", "window"),
+        ("Correctness Plateau", "plateau"),
+        ("Correctness Rule Fired", "correct"),
+    ]
+    delta_columns = [
+        ("Parseability Delta", "d_parse"),
+        ("Formatting Delta", "d_fmt"),
+        ("Finished Delta", "d_fin"),
+        ("Correctness Delta", "d_corr"),
+    ]
+
+    rule_matrix = np.array(
+        [[1.0 if bool(row.get(column)) else 0.0 for column, _ in rule_columns] for row in plot_rows],
+        dtype=float,
+    )
+    delta_matrix = np.array(
+        [[float(row.get(column) or 0.0) for column, _ in delta_columns] for row in plot_rows],
+        dtype=float,
+    )
+
+    fig, (rule_ax, delta_ax) = plt.subplots(
+        1,
+        2,
+        figsize=(14, max(6, len(plot_rows) * 0.32)),
+        gridspec_kw={"width_ratios": [len(rule_columns), len(delta_columns)]},
+    )
+    rule_im = rule_ax.imshow(rule_matrix, aspect="auto", cmap="Greys", vmin=0.0, vmax=1.0)
+    delta_limit = max(0.5, float(np.nanmax(np.abs(delta_matrix))) if delta_matrix.size else 0.5)
+    delta_im = delta_ax.imshow(delta_matrix, aspect="auto", cmap="RdYlGn", vmin=-delta_limit, vmax=delta_limit)
+
+    rule_ax.set_yticks(range(len(plot_rows)))
+    rule_ax.set_yticklabels(row_labels, fontsize=8)
+    delta_ax.set_yticks(range(len(plot_rows)))
+    delta_ax.set_yticklabels([])
+    rule_ax.set_xticks(range(len(rule_columns)))
+    rule_ax.set_xticklabels([label for _, label in rule_columns], rotation=45, ha="right")
+    delta_ax.set_xticks(range(len(delta_columns)))
+    delta_ax.set_xticklabels([label for _, label in delta_columns], rotation=45, ha="right")
+    rule_ax.set_title("Rule Triggers", loc="left", fontsize=12)
+    delta_ax.set_title("Weight Deltas", loc="left", fontsize=12)
+
+    for row_index, row in enumerate(plot_rows):
+        for column_index, (column_name, _) in enumerate(rule_columns):
+            if bool(row.get(column_name)):
+                rule_ax.text(column_index, row_index, "x", ha="center", va="center", color="#ff7f0e", fontsize=8)
+        for column_index, (column_name, _) in enumerate(delta_columns):
+            value = float(row.get(column_name) or 0.0)
+            if abs(value) > 1e-9:
+                delta_ax.text(column_index, row_index, f"{value:+.2f}", ha="center", va="center", color="black", fontsize=7)
+
+    fig.colorbar(rule_im, ax=rule_ax, fraction=0.046, pad=0.03)
+    fig.colorbar(delta_im, ax=delta_ax, fraction=0.046, pad=0.03)
+    fig.suptitle("Controller Rule Audit Heatmap", fontsize=14)
+    save_plot_dual(fig, "controller_rule_heatmap")
     plt.close(fig)
 
 
@@ -2965,6 +3551,7 @@ def write_readme(milestones: list[dict[str, Any]], all_rows: list[dict[str, Any]
         "",
         "Generated plots:",
         "- `plots/evolution_panels.png`",
+        "- `plots/evolution_panels_notebook.png`",
         "- `plots/base_vs_final_improvement.png`",
         "- `plots/curriculum_map.png`",
         "- `plots/phase_stage_heatmap.png`",
@@ -3033,6 +3620,7 @@ def write_table_docs(
     resource_rows: list[dict[str, Any]],
     knob_rows: list[dict[str, Any]],
     timeline_rows: list[dict[str, Any]],
+    controller_audit_rows: list[dict[str, Any]],
 ) -> None:
     master_glossary = render_column_glossary(MASTER_COLUMN_GROUPS, MASTER_COLUMN_DESCRIPTIONS)
     resource_glossary = render_column_glossary(
@@ -3043,6 +3631,9 @@ def write_table_docs(
     )
     timeline_glossary = render_column_glossary(
         [("Runtime Stabilization Timeline Columns", list(timeline_rows[0].keys()))], TIMELINE_COLUMN_DESCRIPTIONS
+    )
+    controller_glossary = render_column_glossary(
+        [("Controller Audit Columns", CONTROLLER_AUDIT_COLUMNS)], CONTROLLER_AUDIT_COLUMN_DESCRIPTIONS
     )
 
     write_markdown_doc(
@@ -3085,6 +3676,14 @@ def write_table_docs(
         glossary_markdown=timeline_glossary,
         analysis_lines=analysis_for_timeline(timeline_rows),
     )
+    write_markdown_doc(
+        markdown_path=TABLES_DIR / "controller_rule_audit.md",
+        title="Controller Rule Audit",
+        csv_name="tables/controller_rule_audit.csv",
+        purpose="Checkpoint-by-checkpoint audit of which reward-controller rules fired, what evidence triggered them, and which reward weights changed.",
+        glossary_markdown=controller_glossary,
+        analysis_lines=analysis_for_controller_audit(controller_audit_rows),
+    )
 
 
 def sanitize_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -3110,15 +3709,18 @@ def main() -> None:
     resource_rows = build_resource_rows(milestone_rows)
     knob_rows = build_knob_tradeoff_rows()
     timeline_rows = build_runtime_timeline_rows(milestone_rows)
+    controller_audit_rows = sanitize_rows(build_controller_audit_rows(all_rows))
 
     write_csv(TABLES_DIR / "master_table_all_checkpoints.csv", all_rows, MASTER_TABLE_COLUMNS)
     write_csv(TABLES_DIR / "master_table_milestones.csv", milestone_rows, MASTER_TABLE_COLUMNS)
     write_csv(TABLES_DIR / "resource_runtime_tuning.csv", resource_rows, list(resource_rows[0].keys()))
     write_csv(TABLES_DIR / "resource_knob_tradeoffs.csv", knob_rows, list(knob_rows[0].keys()))
     write_csv(TABLES_DIR / "runtime_stabilization_timeline.csv", timeline_rows, list(timeline_rows[0].keys()))
-    write_table_docs(milestone_rows, all_rows, resource_rows, knob_rows, timeline_rows)
+    write_csv(TABLES_DIR / "controller_rule_audit.csv", controller_audit_rows, CONTROLLER_AUDIT_COLUMNS)
+    write_table_docs(milestone_rows, all_rows, resource_rows, knob_rows, timeline_rows, controller_audit_rows)
 
     plot_main_evolution(all_rows)
+    plot_main_evolution(all_rows, stem="evolution_panels_notebook", include_notebook_panel=True)
     plot_base_vs_final_improvement(all_rows)
     plot_curriculum_map(milestone_rows)
     plot_phase_stage_heatmap(milestone_rows)
@@ -3129,6 +3731,7 @@ def main() -> None:
     plot_runtime_timeline(timeline_rows)
     plot_frontier(all_rows)
     plot_heatmap(all_rows)
+    plot_controller_rule_heatmap(controller_audit_rows)
     plot_lineage()
 
     write_readme(milestone_rows, all_rows, resource_rows)

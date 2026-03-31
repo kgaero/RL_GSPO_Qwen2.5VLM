@@ -1,0 +1,110 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.7in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue
+}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcommand{\rulekey}[1]{\nolinkurl{#1}}
+
+\begin{document}
+
+\begin{center}
+{\LARGE \textbf{Controller Rule Reference}}\\[0.5em]
+{\large Rule names match the audit labels used in \texttt{controller\_rule\_audit}}\\[1em]
+\end{center}
+
+\renewcommand{\arraystretch}{1.18}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\begin{longtable}{L{0.17\textwidth} L{0.18\textwidth} L{0.11\textwidth} L{0.30\textwidth} L{0.14\textwidth}}
+\toprule
+\textbf{Audit Reference} &
+\textbf{Rule Key} &
+\textbf{Rule Type} &
+\textbf{Description} &
+\textbf{In Your 7?} \\
+\midrule
+\endfirsthead
+
+\toprule
+\textbf{Audit Reference} &
+\textbf{Rule Key} &
+\textbf{Rule Type} &
+\textbf{Description} &
+\textbf{In Your 7?} \\
+\midrule
+\endhead
+
+\texttt{Phase Reset} &
+ &
+phase defaults &
+Not a controller trigger. When a new phase or run starts, weights reset to that phase's configured initial values. A first checkpoint in a phase can therefore show both \texttt{Phase Reset} and guard-driven deltas in the same row. &
+No \\
+
+\texttt{Parseable Guard Fired} &
+\rulekey{parseable_guard} &
+update rule &
+Fires when \texttt{parseable\_answer\_rate < 0.85}; sets \texttt{after = max(before, 0.75)} for \texttt{parseable\_reward}. This is a floor lift, not a fixed increment, so \texttt{0.50 -> 0.75} appears as \texttt{d\_parse = +0.25}. &
+Yes, item 1 \\
+
+\texttt{Format Guard Fired} &
+\rulekey{format_guard} &
+update rule &
+Fires when \texttt{solution\_tag\_compliance < 0.90} or \texttt{reasoning\_tag\_compliance < 0.88} or \texttt{malformed\_answer\_rate > 0.10}; sets \texttt{after = max(before, 0.75)} for \texttt{format\_reward}. This is a floor lift, not a fixed increment, so \texttt{0.50 -> 0.75} appears as \texttt{d\_fmt = +0.25}. &
+Yes, item 2 \\
+
+\texttt{Finish Guard Fired} &
+\rulekey{finish_guard} &
+update rule &
+Fires when \texttt{truncation\_rate > 0.15} or \texttt{average\_completion\_tokens > 0.85 * max\_completion\_length}; adds \texttt{+0.25} to \texttt{finished\_reward}. &
+Yes, item 3 \\
+
+\texttt{Stable Structure} &
+\rulekey{stable_structure} &
+helper condition &
+True when \texttt{parseable >= 0.92} and \texttt{solution >= 0.95} and \texttt{reasoning >= 0.93} and \texttt{malformed <= 0.05} and \texttt{truncation <= 0.08}. &
+Yes, item 5 \\
+
+\texttt{Stable Window Ready} &
+\rulekey{stable_window_ready} &
+helper condition &
+True only after at least \texttt{2} eval checkpoints exist in the same phase history. Plateau is not checked until this is true. &
+No \\
+
+\texttt{Correctness Plateau} &
+\rulekey{correctness_plateau} &
+helper condition &
+True when \texttt{current\_exact - previous\_exact < 0.02}. Because the test is \texttt{< 0.02}, regressions also satisfy it. &
+Mostly item 6, but incomplete without \texttt{Stable Window Ready} \\
+
+\texttt{Correctness Rule Fired} &
+\rulekey{correctness_escalation} &
+update rule &
+Fires only when \texttt{stable\_structure and stable\_window\_ready and correctness\_plateau}; adds \texttt{+0.50} to \texttt{correctness\_reward}. &
+Yes, item 4, but missing \texttt{Stable Window Ready} \\
+
+\texttt{Clamped Components} &
+\rulekey{clamped_components} &
+post-update constraint record &
+Not a trigger rule. After updates, any weight outside its component bounds is clamped to min or max and recorded here. &
+Mostly item 7 \\
+\bottomrule
+\end{longtable}
+
+\vspace{0.5em}
+\noindent\textbf{Source logic}\\
+\texttt{staged\_rl/controller.py}\\
+\texttt{staged\_rl/config.py}
+
+\end{document}

@@ -101,6 +101,7 @@ Checkpoint artifacts are written into each checkpoint directory:
 - `subset_metrics.json`
 - `reward_weights.json`
 - `controller_state.json`
+- `controller_decision.json`
 - `summary.txt`
 - `per_sample_records.jsonl`
 - `per_prompt_records.json`

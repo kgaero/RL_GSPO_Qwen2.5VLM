@@ -28,6 +28,7 @@ venv/
 ENV/
 env/
 .env/
+.venv*/
 
 # OS-specific noise
 .DS_Store
