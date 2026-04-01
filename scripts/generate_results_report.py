@@ -1757,34 +1757,38 @@ def plot_main_evolution(
         )
 
     notebook_same_run_warm_starts: list[dict[str, Any]] = []
-    for source_key, target_key, edge_label, edge_y_offset, label_y_offset in [
+    for source_key, target_key, edge_label, edge_y_offset, label_y_offset, label_x_fraction in [
         (
             ("smoke_testmini", "phase_a", "checkpoint-49"),
             ("smoke_testmini", "phase_b"),
             "best_structure",
             -0.18,
-            -0.16,
+            -0.30,
+            0.36,
         ),
         (
             ("smoke_testmini", "phase_b", "checkpoint-60"),
             ("smoke_testmini", "phase_c"),
             "best_composite",
             -0.34,
-            -0.16,
+            -0.28,
+            0.58,
         ),
         (
             ("smoke_testmini", "phase_c", "checkpoint-119"),
             ("smoke_testmini", "phase_d"),
             "best_composite",
             0.24,
-            0.16,
+            0.30,
+            0.34,
         ),
         (
             ("large_split_continue", "phase_c", "checkpoint-120"),
             ("large_split_continue", "phase_d"),
             "same notebook\nwarm-start\nfrom ckpt-120",
             0.22,
-            0.18,
+            0.30,
+            0.50,
         ),
     ]:
         source_row = plot_row_lookup.get(source_key)
@@ -1798,6 +1802,7 @@ def plot_main_evolution(
                 "edge_label": edge_label,
                 "edge_y_offset": edge_y_offset,
                 "label_y_offset": label_y_offset,
+                "label_x_fraction": label_x_fraction,
             }
         )
 
@@ -2365,6 +2370,7 @@ def plot_main_evolution(
             target_y = notebook_to_y[target_row["Notebook / Run Slug"]]
             edge_y = source_y + transfer["edge_y_offset"]
             label_y = edge_y + transfer["label_y_offset"]
+            label_x = source_x + (target_x - source_x) * transfer["label_x_fraction"]
             edge_arrow = notebook_ax.annotate(
                 "",
                 xy=(target_x - 0.05, edge_y),
@@ -2383,8 +2389,8 @@ def plot_main_evolution(
             edge_arrow.set_zorder(4)
             label_annotation = notebook_ax.annotate(
                 transfer["edge_label"],
-                xy=((source_x + target_x) / 2.0, label_y),
-                xytext=((source_x + target_x) / 2.0, label_y),
+                xy=(label_x, label_y),
+                xytext=(label_x, label_y),
                 textcoords="data",
                 ha="center",
                 va="center",
