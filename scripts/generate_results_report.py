@@ -618,6 +618,36 @@ def json_load(path: Path | None) -> dict[str, Any]:
     return json.loads(path.read_text())
 
 
+def coerce_csv_scalar(value: str) -> Any:
+    text = str(value).strip()
+    if text == "":
+        return ""
+    if text == "True":
+        return True
+    if text == "False":
+        return False
+    try:
+        if text.isdigit() or (text.startswith("-") and text[1:].isdigit()):
+            return int(text)
+        return float(text)
+    except ValueError:
+        return value
+
+
+def load_csv_rows(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        return [
+            {
+                key: coerce_csv_scalar(value)
+                for key, value in row.items()
+            }
+            for row in reader
+        ]
+
+
 def maybe_path(path: Path) -> str:
     return str(path) if path.exists() else ""
 
@@ -1597,6 +1627,13 @@ def plot_main_evolution(
     notebook_order = list(dict.fromkeys(row["Notebook / Run Slug"] for row in plot_rows))
     notebook_to_y = {label: index for index, label in enumerate(notebook_order)}
     notebook_y = [notebook_to_y[row["Notebook / Run Slug"]] for row in plot_rows]
+    plot_row_lookup = {
+        (row["Run Family"], row["Phase"], row["Checkpoint"]): row
+        for row in plot_rows
+    }
+    phase_start_rows: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in plot_rows:
+        phase_start_rows.setdefault((row["Run Family"], row["Phase"]), row)
 
     split_to_y = {"unknown_pre_refactor": 0, "testmini": 1, "test": 2}
     stage_series_lookup = {
@@ -1671,6 +1708,53 @@ def plot_main_evolution(
         wrap_ready = label.replace("/", "/ ").replace("_", "_ ")
         wrapped = textwrap.fill(wrap_ready, width=width, break_long_words=False, break_on_hyphens=True)
         return wrapped.replace("/ ", "/").replace("_ ", "_")
+
+    def extract_dataset_slug(path_text: str) -> str:
+        path_value = str(path_text or "").strip()
+        if not path_value:
+            return ""
+        parts = Path(path_value).parts
+        if "datasets" in parts:
+            dataset_index = parts.index("datasets")
+            if dataset_index + 2 < len(parts):
+                return parts[dataset_index + 2]
+        return Path(path_value).parent.name
+
+    def dataset_node_label(warm_start_path: str) -> str:
+        slug = extract_dataset_slug(warm_start_path)
+        short_slug = slug.removeprefix("rl-gspo-qwen2-5vlm-")
+        if short_slug.endswith("-checkpoint"):
+            short_slug = short_slug[: -len("-checkpoint")]
+        checkpoint_name = Path(str(warm_start_path)).name or "checkpoint"
+        display_slug = short_slug or slug or "attached-checkpoint"
+        return "\n".join(
+            [
+                "Kaggle dataset",
+                wrap_axis_label(display_slug, width=18),
+                checkpoint_name,
+            ]
+        )
+
+    notebook_dataset_transfers: list[dict[str, Any]] = []
+    for source_key, target_key in [
+        (("smoke_testmini", "phase_c", "checkpoint-119"), ("large_split_continue", "phase_c")),
+        (("large_split_continue", "phase_c", "checkpoint-120"), ("phase_d_dedicated", "phase_d")),
+    ]:
+        source_row = plot_row_lookup.get(source_key)
+        target_row = phase_start_rows.get(target_key)
+        if source_row is None or target_row is None:
+            continue
+        warm_start_path = str(target_row.get("Warm-Start Checkpoint") or "").strip()
+        if not warm_start_path:
+            continue
+        notebook_dataset_transfers.append(
+            {
+                "source_row": source_row,
+                "target_row": target_row,
+                "warm_start_path": warm_start_path,
+                "node_label": dataset_node_label(warm_start_path),
+            }
+        )
 
     fig, axes = plt.subplots(
         14 if include_notebook_panel else 13,
@@ -2150,6 +2234,83 @@ def plot_main_evolution(
         notebook_ax.grid(False, axis="y")
         notebook_ax.set_xticks(x)
         notebook_ax.set_xticklabels(x_tick_labels, rotation=60, ha="right", fontsize=8)
+        dataset_arrow_color = "#8c7a00"
+        dataset_node_fill = "#fff3bf"
+        dataset_node_edge = "#5c5200"
+        for transfer in notebook_dataset_transfers:
+            source_row = transfer["source_row"]
+            target_row = transfer["target_row"]
+            source_x = source_row["Timeline Order"]
+            source_y = notebook_to_y[source_row["Notebook / Run Slug"]]
+            target_x = target_row["Timeline Order"]
+            target_y = notebook_to_y[target_row["Notebook / Run Slug"]]
+            node_x = target_x - 0.75
+            if node_x <= source_x + 0.45:
+                node_x = source_x + (target_x - source_x) * 0.55
+            node_y = (source_y + target_y) / 2.0
+            curve_mag = 0.18 if (target_x - source_x) > 6 else 0.08
+            source_arrow = notebook_ax.annotate(
+                "",
+                xy=(node_x, node_y),
+                xytext=(source_x, source_y),
+                arrowprops={
+                    "arrowstyle": "->",
+                    "linewidth": 1.4,
+                    "linestyle": (0, (4, 2)),
+                    "color": dataset_arrow_color,
+                    "shrinkA": 6,
+                    "shrinkB": 6,
+                    "connectionstyle": f"arc3,rad={-curve_mag}",
+                    "alpha": 0.95,
+                },
+            )
+            source_arrow.set_zorder(4)
+            target_arrow = notebook_ax.annotate(
+                "",
+                xy=(target_x, target_y),
+                xytext=(node_x, node_y),
+                arrowprops={
+                    "arrowstyle": "->",
+                    "linewidth": 1.4,
+                    "linestyle": (0, (4, 2)),
+                    "color": dataset_arrow_color,
+                    "shrinkA": 6,
+                    "shrinkB": 6,
+                    "connectionstyle": f"arc3,rad={curve_mag / 2}",
+                    "alpha": 0.95,
+                },
+            )
+            target_arrow.set_zorder(4)
+            notebook_ax.scatter(
+                [node_x],
+                [node_y],
+                marker="D",
+                s=85,
+                facecolor=dataset_node_fill,
+                edgecolor=dataset_node_edge,
+                linewidth=1.0,
+                zorder=5,
+            )
+            label_x = node_x
+            label_y = max(-0.15, min(source_y, target_y) - 0.55)
+            node_annotation = notebook_ax.annotate(
+                transfer["node_label"],
+                xy=(node_x, node_y),
+                xytext=(label_x, label_y),
+                textcoords="data",
+                ha="center",
+                va="center",
+                fontsize=6.8,
+                linespacing=0.95,
+                bbox={
+                    "boxstyle": "round,pad=0.24",
+                    "facecolor": "white",
+                    "edgecolor": dataset_node_edge,
+                    "linewidth": 0.9,
+                    "alpha": 0.97,
+                },
+            )
+            node_annotation.set_zorder(6)
 
     fig.suptitle("RL Fine-Tuning Evolution Across Smoke, Large-Split, and Dedicated Phase D Runs", fontsize=16)
     fig.text(
@@ -2167,23 +2328,14 @@ def plot_main_evolution(
 
 def build_resource_rows(milestones: list[dict[str, Any]]) -> list[dict[str, Any]]:
     default_cfg = asdict(build_default_run_config("phase_a"))
-    default_phase = default_cfg["phases"]["phase_a"]
     default_trainer = dict(default_cfg["trainer_defaults"])
     default_model = dict(default_cfg["model"])
-    default_eval = dict(default_cfg["eval"])
 
-    def row_for_milestone(milestone_id: str) -> dict[str, Any]:
+    def row_for_milestone(milestone_id: str) -> dict[str, Any] | None:
         for row in milestones:
             if row["Milestone ID"] == milestone_id:
                 return row
-        raise KeyError(milestone_id)
-
-    stable_rows = [
-        row_for_milestone("smoke_phase_a_best"),
-        row_for_milestone("large_phase_c_best_recommended"),
-        row_for_milestone("large_phase_d_same_notebook_best"),
-        row_for_milestone("dedicated_phase_d_best"),
-    ]
+        return None
 
     def diff_summary(target: dict[str, Any]) -> str:
         changes = []
@@ -2260,7 +2412,9 @@ def build_resource_rows(milestones: list[dict[str, Any]]) -> list[dict[str, Any]
         "large_phase_d_same_notebook_best",
         "dedicated_phase_d_best",
     ]:
-        row = milestone_by_id[milestone_id]
+        row = milestone_by_id.get(milestone_id)
+        if row is None:
+            continue
         rows.append(
             {
                 "Run Family": row["Run Family"],
@@ -3705,6 +3859,10 @@ def main() -> None:
     ensure_dirs()
 
     all_rows = sanitize_rows(build_all_checkpoint_rows())
+    if len(all_rows) <= 1:
+        fallback_rows = load_csv_rows(TABLES_DIR / "master_table_all_checkpoints.csv")
+        if fallback_rows:
+            all_rows = sanitize_rows(fallback_rows)
     milestone_rows = sanitize_rows(build_milestone_rows(all_rows))
     resource_rows = build_resource_rows(milestone_rows)
     knob_rows = build_knob_tradeoff_rows()

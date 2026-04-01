@@ -22,6 +22,14 @@ Generated tables:
 
 Generated plots:
 - `plots/evolution_panels.png`
+- `plots/evolution_panels_notebook.png`
+- `plots/base_vs_final_improvement.png`
+- `plots/curriculum_map.png`
+- `plots/phase_stage_heatmap.png`
+- `plots/split_transition_ladder.png`
+- `plots/milestone_performance_heatmap.png`
+- `plots/curriculum_alluvial.png`
+- `plots/entire_curriculum_overview.png`
 - `plots/runtime_stabilization_timeline.png`
 - `plots/checkpoint_frontier_scatter.png`
 - `plots/checkpoint_heatmap.png`
