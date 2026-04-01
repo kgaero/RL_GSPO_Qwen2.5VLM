@@ -1,0 +1,256 @@
+\documentclass[11pt]{article}
+\usepackage[a3paper,landscape,margin=0.45in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue
+}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\cell}[1]{\shortstack[l]{#1}}
+\definecolor{YesGreen}{RGB}{0,140,60}
+\newcommand{\yesdot}{\textcolor{YesGreen}{\Large$\bullet$}}
+
+\begin{document}
+
+\begin{center}
+{\LARGE \textbf{Transfer and Warm-Start Semantics}}\\[0.5em]
+{\large What moves between Kaggle notebooks, what warm-start actually loads, and what full resume restores}\\[0.75em]
+\end{center}
+
+\noindent\textbf{Why \code{repo source snapshot} and \code{checkpoint manifest} were blank under warm-start and full resume.}
+Those two items belong to the \emph{transport and discovery layer}, not to the runtime state-loading layer.
+Warm-start and full resume both operate \emph{after} a checkpoint directory has already been found.
+They do not themselves load the packaged repo snapshot or the manifest JSON into the model/trainer state.
+In the comprehensive table below, those rows are kept and their blank cells are intentional for the same reason.
+
+\vspace{0.35em}
+\noindent\textbf{Key point.}
+In this repo, \emph{cross notebook}, \emph{warm-start}, and \emph{full resume} are different layers:
+\begin{itemize}
+\item \textbf{Cross notebook} means physical transport through Kaggle dataset attachment.
+\item \textbf{Warm-start} means runtime initialization that loads the base VLM fresh, attaches a fresh LoRA adapter, and copies only adapter weights from the selected checkpoint.
+\item \textbf{Full same-phase resume} means trainer continuation from a checkpoint, which restores optimizer/trainer/controller state in addition to weights.
+\end{itemize}
+
+\noindent\textbf{Caveat.}
+The exact checkpoint-bundle exporter is not versioned in this repo.
+Table~1 therefore combines auditable runtime behavior in this repo with the minimum cross-notebook payload that the receiving Kaggle notebooks require.
+
+\vspace{0.45em}
+\renewcommand{\arraystretch}{1.06}
+\setlength{\tabcolsep}{2pt}
+\fontsize{7.1}{8.1}\selectfont
+
+\begin{center}
+\begin{longtable}{L{0.11\textwidth} C{0.04\textwidth} C{0.04\textwidth} C{0.04\textwidth} L{0.11\textwidth} L{0.09\textwidth} L{0.09\textwidth} L{0.10\textwidth} L{0.24\textwidth}}
+\caption{Comprehensive checklist: what each mechanism transports, loads, or restores}\\
+\toprule
+\textbf{Item} &
+\shortstack{\textbf{Cross}\\\textbf{Notebook}} &
+\shortstack{\textbf{Warm-}\\\textbf{Start}} &
+\shortstack{\textbf{Full}\\\textbf{Resume}} &
+\textbf{Typical File(s)} &
+\textbf{Lives In} &
+\textbf{Used By} &
+\textbf{Source} &
+\textbf{Brief Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Item} &
+\shortstack{\textbf{Cross}\\\textbf{Notebook}} &
+\shortstack{\textbf{Warm-}\\\textbf{Start}} &
+\shortstack{\textbf{Full}\\\textbf{Resume}} &
+\textbf{Typical File(s)} &
+\textbf{Lives In} &
+\textbf{Used By} &
+\textbf{Source} &
+\textbf{Brief Description} \\
+\midrule
+\endhead
+\code{repo source snapshot} &
+\yesdot &
+ &
+ &
+\cell{\code{staged\_rl.tar},\\ \code{tests.tar},\\ repo files} &
+\cell{\code{<code-dataset-root>/}} &
+all Kaggle notebooks &
+\code{prepare\_kaggle\_upload.sh} &
+Packaged repo copy prepared for Kaggle execution. This is code transfer, not learned model state. The packaging script explicitly excludes local outputs and weight files such as \code{*.safetensors}, \code{*.pt}, and \code{*.pth}. \\
+
+\code{checkpoint manifest and routing metadata} &
+\yesdot &
+ &
+ &
+\cell{\code{checkpoint\_bundle\_manifest.json},\\ selected checkpoint relpath,\\ selected checkpoint metrics} &
+\cell{\code{<checkpoint-dataset-root>/}} &
+Notebook 2 and Notebook 3 &
+\cell{\code{kaggle\_staged\_train}\\\code{\_large\_continue.ipynb}\\ \code{kaggle\_staged\_train}\\\code{\_phase\_d\_from\_large}\\\code{\_continue.ipynb}} &
+Discovery and routing metadata used to find the attached checkpoint dataset and locate the checkpoint subtree that becomes \code{WARM\_START\_PATH}. It supports handoff discovery, not parameter loading. \\
+
+\code{selected checkpoint directory} &
+\yesdot &
+\yesdot &
+\yesdot &
+\cell{\code{checkpoint-119/},\\ \code{checkpoint-120/},\\ local checkpoint dir} &
+\cell{checkpoint dataset\\ subtree or local\\ output checkpoint dir} &
+\cell{warm-start loader\\ or trainer resume} &
+\cell{notebook \code{WARM\_START\_PATH} logic,\\ \code{staged\_rl/checkpointing.py}} &
+Directory that acts as the source artifact. Cross notebook, it is transported by dataset attachment. Warm-start and full resume both point to a checkpoint directory as the source checkpoint object. \\
+
+\code{base VLM weights} &
+ &
+\yesdot &
+\yesdot &
+\code{from pretrained base model} &
+external model source &
+model loader &
+\code{staged\_rl/trainer\_runtime.py} &
+Loaded fresh from \code{base\_model\_name} when the new run starts. These weights are not physically transferred through the checkpoint dataset. \\
+
+\code{tokenizer / processor config} &
+ &
+\yesdot &
+\yesdot &
+\cell{\code{tokenizer.json},\\ processor config files} &
+\cell{base-model load path\\ or checkpoint dir} &
+model/tokenizer setup &
+\code{staged\_rl/trainer\_runtime.py} &
+Initialized as part of normal model loading for the new run. This is runtime setup, not the main learned RL transfer payload. \\
+
+\code{fresh LoRA adapter scaffold} &
+ &
+\yesdot &
+\yesdot &
+\code{runtime-created adapter} &
+in-memory runtime state &
+Unsloth / PEFT setup &
+\code{staged\_rl/trainer\_runtime.py} &
+Fresh adapter object attached to the newly loaded base model before any checkpoint state is copied in. \\
+
+\code{LoRA adapter weights} &
+\yesdot &
+\yesdot &
+\yesdot &
+\code{adapter\_model.safetensors} &
+selected checkpoint directory &
+warm-start loader and checkpoint resume &
+\code{staged\_rl/trainer\_runtime.py} &
+The actual learned adapter tensors. This is the key model state transferred across notebook boundaries and also restored on full resume. \\
+
+\code{adapter config metadata} &
+\yesdot &
+\yesdot &
+\yesdot &
+\code{adapter\_config.json} &
+\cell{selected checkpoint\\ directory} &
+\cell{PEFT / Unsloth\\ adapter load path} &
+PEFT checkpoint format &
+PEFT/LoRA metadata needed to interpret the adapter checkpoint correctly. \\
+
+\code{optimizer state} &
+ &
+ &
+\yesdot &
+\code{optimizer.pt} &
+checkpoint dir &
+\cell{full same-phase\\ trainer resume} &
+TRL / Transformers checkpointing &
+Adaptive optimizer buffers and momentum needed for exact continuation of training dynamics. \\
+
+\code{scheduler state} &
+ &
+ &
+\yesdot &
+\code{scheduler.pt} &
+checkpoint dir &
+\cell{full same-phase\\ trainer resume} &
+TRL / Transformers checkpointing &
+Learning-rate scheduler progress so resume continues on the same LR schedule. \\
+
+\code{AMP scaler state} &
+ &
+ &
+\yesdot &
+\code{scaler.pt} &
+checkpoint dir &
+\cell{full same-phase\\ trainer resume} &
+TRL / Transformers checkpointing &
+Mixed-precision gradient-scaling state when present. \\
+
+\code{RNG state} &
+ &
+ &
+\yesdot &
+\code{rng\_state.pth} &
+checkpoint dir &
+\cell{full same-phase\\ trainer resume} &
+TRL / Transformers checkpointing &
+Random-number generator snapshots used to continue from approximately the same stochastic training state. \\
+
+\code{trainer progress / log history} &
+ &
+ &
+\yesdot &
+\cell{\code{trainer\_state.json},\\ \code{training\_args.bin}} &
+checkpoint dir &
+\cell{full same-phase\\ trainer resume} &
+TRL / Transformers checkpointing &
+Global step, epoch progress, callback state, log history, and trainer bookkeeping. \\
+
+\code{reward controller state} &
+ &
+ &
+\yesdot &
+\code{controller\_state.json} &
+checkpoint dir &
+\cell{same-phase\\ reward-controller restore} &
+\code{staged\_rl/trainer\_runtime.py} &
+This repo's staged-RL-specific controller history and active reward-weight state. Warm-start does not carry this across phases. \\
+
+\code{checkpoint reward weights snapshot} &
+ &
+ &
+\yesdot &
+\code{reward\_weights.json} &
+checkpoint dir &
+\cell{same-phase\\ reward-controller\\ restore and audit} &
+\cell{\code{README\_staged\_rl.md},\\ \code{staged\_rl/trainer\_runtime.py}} &
+Saved reward-weight snapshot paired with the controller state for same-phase continuation and auditability. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\noindent\textbf{Legend.}
+\textcolor{YesGreen}{\Large$\bullet$} means that the item is transported, loaded, or restored by that mechanism.
+
+\vspace{0.35em}
+\noindent\textbf{Practical reading.}
+\begin{itemize}
+\item \textbf{Notebook 1 $\rightarrow$ Notebook 2} and \textbf{Notebook 2 $\rightarrow$ Notebook 3} are Kaggle dataset handoffs followed by adapter-only warm-start.
+\item \textbf{Large Phase C $\rightarrow$ Large Phase D in the same notebook} is still warm-start, not full resume, because it is a cross-phase start.
+\item Only a \textbf{same-phase restart} uses full trainer resume semantics.
+\end{itemize}
+
+\vspace{0.35em}
+\noindent\textbf{Source logic}\\
+\code{prepare\_kaggle\_upload.sh}: code dataset packaging and exclusions\\
+\code{kaggle\_staged\_train\_large\_continue.ipynb}: manifest discovery and \code{WARM\_START\_PATH}\\
+\code{kaggle\_staged\_train\_phase\_d\_from\_large\_continue.ipynb}: same continuation pattern for Notebook 3\\
+\code{staged\_rl/checkpointing.py}: warm-start vs trainer-resume selector logic\\
+\code{staged\_rl/trainer\_runtime.py}: fresh model load, fresh LoRA attachment, adapter warm-start, and same-phase resume behavior\\
+\code{README\_staged\_rl.md}: checkpoint-side artifact inventory
+
+\end{document}

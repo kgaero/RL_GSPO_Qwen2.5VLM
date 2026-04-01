@@ -1756,6 +1756,26 @@ def plot_main_evolution(
             }
         )
 
+    notebook_same_run_warm_starts: list[dict[str, Any]] = []
+    for source_key, target_key, edge_label in [
+        (
+            ("large_split_continue", "phase_c", "checkpoint-120"),
+            ("large_split_continue", "phase_d"),
+            "same notebook\nwarm-start\nfrom ckpt-120",
+        ),
+    ]:
+        source_row = plot_row_lookup.get(source_key)
+        target_row = phase_start_rows.get(target_key)
+        if source_row is None or target_row is None:
+            continue
+        notebook_same_run_warm_starts.append(
+            {
+                "source_row": source_row,
+                "target_row": target_row,
+                "edge_label": edge_label,
+            }
+        )
+
     fig, axes = plt.subplots(
         14 if include_notebook_panel else 13,
         1,
@@ -2311,6 +2331,48 @@ def plot_main_evolution(
                 },
             )
             node_annotation.set_zorder(6)
+        for transfer in notebook_same_run_warm_starts:
+            source_row = transfer["source_row"]
+            target_row = transfer["target_row"]
+            source_x = source_row["Timeline Order"]
+            source_y = notebook_to_y[source_row["Notebook / Run Slug"]]
+            target_x = target_row["Timeline Order"]
+            target_y = notebook_to_y[target_row["Notebook / Run Slug"]]
+            edge_y = source_y + 0.22
+            edge_arrow = notebook_ax.annotate(
+                "",
+                xy=(target_x - 0.05, edge_y),
+                xytext=(source_x + 0.05, edge_y),
+                arrowprops={
+                    "arrowstyle": "->",
+                    "linewidth": 1.4,
+                    "linestyle": (0, (4, 2)),
+                    "color": dataset_arrow_color,
+                    "shrinkA": 0,
+                    "shrinkB": 0,
+                    "connectionstyle": "arc3,rad=0.0",
+                    "alpha": 0.95,
+                },
+            )
+            edge_arrow.set_zorder(4)
+            label_annotation = notebook_ax.annotate(
+                transfer["edge_label"],
+                xy=((source_x + target_x) / 2.0, edge_y + 0.18),
+                xytext=((source_x + target_x) / 2.0, edge_y + 0.18),
+                textcoords="data",
+                ha="center",
+                va="center",
+                fontsize=6.8,
+                linespacing=0.95,
+                bbox={
+                    "boxstyle": "round,pad=0.24",
+                    "facecolor": "white",
+                    "edgecolor": dataset_node_edge,
+                    "linewidth": 0.9,
+                    "alpha": 0.97,
+                },
+            )
+            label_annotation.set_zorder(6)
 
     fig.suptitle("RL Fine-Tuning Evolution Across Smoke, Large-Split, and Dedicated Phase D Runs", fontsize=16)
     fig.text(
