@@ -1816,7 +1816,7 @@ def plot_main_evolution(
             "hspace": 0.10,
         },
     )
-    fig.subplots_adjust(right=0.84)
+    fig.subplots_adjust(right=0.84, top=0.955, bottom=0.045)
 
     segments: list[tuple[int, int, str]] = []
     if plot_rows:
@@ -1831,7 +1831,7 @@ def plot_main_evolution(
             previous_x = row["Timeline Order"]
         segments.append((start, previous_x, current_label))
 
-    def add_segments(ax: Any, label_position: str | None = None) -> None:
+    def add_segments(ax: Any, label_position: str | None = None, bottom_y_offset: float = -0.98) -> None:
         for index, (start, end, label) in enumerate(segments):
             ax.axvspan(start - 0.5, end + 0.5, color=("#f7f7f7" if index % 2 == 0 else "#eef3f9"), alpha=0.7, zorder=0)
             ax.axvline(end + 0.5, color="#bbbbbb", linestyle="--", linewidth=0.7)
@@ -1839,10 +1839,10 @@ def plot_main_evolution(
                 span = end - start + 1
                 display_label = compact_phase_header(label, span)
                 if label_position == "top":
-                    y_offset = 1.085
+                    y_offset = 1.11
                     va = "bottom"
                 else:
-                    y_offset = -0.98
+                    y_offset = bottom_y_offset
                     va = "top"
                 ax.text(
                     (start + end) / 2,
@@ -2256,7 +2256,7 @@ def plot_main_evolution(
 
     if include_notebook_panel:
         notebook_ax = axes[13]
-        add_segments(notebook_ax, label_position="bottom")
+        add_segments(notebook_ax, label_position="bottom", bottom_y_offset=-0.35)
         for notebook_index in range(len(notebook_order)):
             notebook_ax.axhline(notebook_index, color="#d7d7d7", linewidth=0.8, zorder=1)
         notebook_ax.step(x, notebook_y, where="mid", color="#6f6f6f", linewidth=1.8, zorder=2)
@@ -2406,13 +2406,17 @@ def plot_main_evolution(
             )
             label_annotation.set_zorder(6)
 
-    fig.suptitle("RL Fine-Tuning Evolution Across Smoke, Large-Split, and Dedicated Phase D Runs", fontsize=16)
+    fig.suptitle(
+        "RL Fine-Tuning Evolution Across Smoke, Large-Split, and Dedicated Phase D Runs",
+        fontsize=16,
+        y=0.982,
+    )
     fig.text(
         0.5,
-        0.985,
+        0.014,
         "Eval coverage per subset is tiny (2 for smoke runs, 4 for larger runs), so many metrics are strongly quantized.",
         ha="center",
-        va="top",
+        va="bottom",
         fontsize=10,
         color="#555555",
     )
