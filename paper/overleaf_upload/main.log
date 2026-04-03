@@ -1,9 +1,9 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.3.30)  3 APR 2026 15:12
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.3.30)  3 APR 2026 15:47
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
-**staged_metric_gated_grpo_supplement.tex
-(./staged_metric_gated_grpo_supplement.tex
+**main.tex
+(./main.tex
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
 (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/base/article.cls
@@ -318,78 +318,94 @@ Package microtype Info: Loading configuration file microtype.cfg.
 File: microtype.cfg 2026/03/01 v3.2d microtype main configuration file (RS)
 )
 LaTeX Info: Redefining \microtypesetup on input line 3065.
+) (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/caption/subcaption.sty
+Package: subcaption 2023/07/28 v1.6b Sub-captions (AR)
+ (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/caption/caption.sty
+Package: caption 2023/08/05 v3.6o Customizing captions (AR)
+ (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/caption/caption3.sty
+Package: caption3 2023/07/31 v2.4d caption3 kernel (AR)
+\caption@tempdima=\dimen183
+\captionmargin=\dimen184
+\caption@leftmargin=\dimen185
+\caption@rightmargin=\dimen186
+\caption@width=\dimen187
+\caption@indent=\dimen188
+\caption@parindent=\dimen189
+\caption@hangindent=\dimen190
+Package caption Info: Standard document class detected.
+)
+\c@caption@flags=\count319
+\c@continuedfloat=\count320
+Package caption Info: hyperref package is loaded.
+)
+Package caption Info: New subtype `subfigure' on input line 238.
+\c@subfigure=\count321
+Package caption Info: New subtype `subtable' on input line 238.
+\c@subtable=\count322
 ) (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/enumitem/enumitem.sty
 Package: enumitem 2025/02/06 v3.11 Customized lists
 \labelindent=\skip67
-\enit@outerparindent=\dimen183
+\enit@outerparindent=\dimen191
 \enit@toks=\toks25
 \enit@inbox=\box58
-\enit@count@id=\count319
-\enitdp@description=\count320
+\enit@count@id=\count323
+\enitdp@description=\count324
 ) (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/tools/array.sty
 Package: array 2025/09/25 v2.6n Tabular extension package (FMi)
-\col@sep=\dimen184
+\col@sep=\dimen192
 \ar@mcellbox=\box59
-\extrarowheight=\dimen185
+\extrarowheight=\dimen193
 \NC@list=\toks26
 \extratabsurround=\skip68
 \backup@length=\skip69
 \ar@cellbox=\box60
-) (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/fancyvrb/fancyvrb.sty
-Package: fancyvrb 2025/07/28 4.6 verbatim text (tvz,hv)
-\FV@CodeLineNo=\count321
-\FV@InFile=\read2
-\FV@TabBox=\box61
-\c@FancyVerbLine=\count322
-\FV@StepNumber=\count323
-\FV@OutFile=\write3
 )
-Package hyperref Info: Option `colorlinks' set `true' on input line 22.
-LaTeX Font Info:    Trying to load font information for OT1+ptm on input line 35.
+Package hyperref Info: Option `colorlinks' set `true' on input line 21.
+LaTeX Font Info:    Trying to load font information for OT1+ptm on input line 37.
  (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/psnfss/ot1ptm.fd
 File: ot1ptm.fd 2001/06/04 font definitions for OT1/ptm.
 ) (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
 File: l3backend-pdftex.def 2025-10-09 L3 backend support: PDF output (pdfTeX)
-\l__color_backend_stack_int=\count324
-) (./staged_metric_gated_grpo_supplement.aux)
-\openout1 = `staged_metric_gated_grpo_supplement.aux'.
+\l__color_backend_stack_int=\count325
+) (./main.aux)
+\openout1 = `main.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 35.
-LaTeX Font Info:    ... okay on input line 35.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 35.
-LaTeX Font Info:    ... okay on input line 35.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 35.
-LaTeX Font Info:    ... okay on input line 35.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 35.
-LaTeX Font Info:    ... okay on input line 35.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 35.
-LaTeX Font Info:    ... okay on input line 35.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 35.
-LaTeX Font Info:    ... okay on input line 35.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 35.
-LaTeX Font Info:    ... okay on input line 35.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 35.
-LaTeX Font Info:    ... okay on input line 35.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 35.
-LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
  (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
 Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
 Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 485.
  (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg
 File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Live
 ))
-Package hyperref Info: Link coloring ON on input line 35.
- (./staged_metric_gated_grpo_supplement.out) (./staged_metric_gated_grpo_supplement.out)
-\@outlinefile=\write4
-\openout4 = `staged_metric_gated_grpo_supplement.out'.
+Package hyperref Info: Link coloring ON on input line 37.
+ (./main.out) (./main.out)
+\@outlinefile=\write3
+\openout3 = `main.out'.
 
-LaTeX Info: Redefining \microtypecontext on input line 35.
-Package microtype Info: Applying patch `item' on input line 35.
-Package microtype Info: Applying patch `toc' on input line 35.
-Package microtype Info: Applying patch `eqnum' on input line 35.
-Package microtype Info: Applying patch `footnote' on input line 35.
-Package microtype Info: Applying patch `verbatim' on input line 35.
-LaTeX Info: Redefining \microtypesetup on input line 35.
+LaTeX Info: Redefining \microtypecontext on input line 37.
+Package microtype Info: Applying patch `item' on input line 37.
+Package microtype Info: Applying patch `toc' on input line 37.
+Package microtype Info: Applying patch `eqnum' on input line 37.
+Package microtype Info: Applying patch `footnote' on input line 37.
+Package microtype Info: Applying patch `verbatim' on input line 37.
+LaTeX Info: Redefining \microtypesetup on input line 37.
 Package microtype Info: Generating PDF output.
 Package microtype Info: Character protrusion enabled (level 2).
 Package microtype Info: Using default protrusion set `alltext'.
@@ -402,51 +418,74 @@ Package microtype Info: No adjustment of interword spacing.
 Package microtype Info: No adjustment of character kerning.
  (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/microtype/mt-ptm.cfg
 File: mt-ptm.cfg 2006/04/20 v1.7 microtype config. file: Times (RS)
-) (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/microtype/mt-cmr.cfg
+)
+Package caption Info: Begin \AtBeginDocument code.
+Package caption Info: End \AtBeginDocument code.
+ (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/microtype/mt-cmr.cfg
 File: mt-cmr.cfg 2013/05/19 v2.2 microtype config. file: Computer Modern Roman (RS)
 )
-LaTeX Font Info:    Trying to load font information for U+msa on input line 38.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 40.
  (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 ) (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/microtype/mt-msa.cfg
 File: mt-msa.cfg 2006/02/04 v1.1 microtype config. file: AMS symbols (a) (RS)
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 38.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 40.
  (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 ) (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/microtype/mt-msb.cfg
 File: mt-msb.cfg 2005/06/01 v1.0 microtype config. file: AMS symbols (b) (RS)
 )
-LaTeX Font Info:    Trying to load font information for OT1+pcr on input line 38.
+LaTeX Font Info:    Trying to load font information for OT1+pcr on input line 40.
  (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/psnfss/ot1pcr.fd
 File: ot1pcr.fd 2001/06/04 font definitions for OT1/pcr.
-)
-LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 54.
- (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/psnfss/ts1ptm.fd
-File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
 ) [1
 
-{/home/kgaer/.TinyTeX/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/home/kgaer/.TinyTeX/texmf-dist/fonts/enc/dvips/base/8r.enc}] [2] [3] [4] [5] (./staged_metric_gated_grpo_supplement.aux)
+{/home/kgaer/.TinyTeX/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/home/kgaer/.TinyTeX/texmf-dist/fonts/enc/dvips/base/8r.enc}]
+<figures/staged_training_pipeline_better.png, id=85, 1745.01938pt x 1003.49907pt>
+File: figures/staged_training_pipeline_better.png Graphic file (type png)
+<use figures/staged_training_pipeline_better.png>
+Package pdftex.def Info: figures/staged_training_pipeline_better.png  used on input line 70.
+(pdftex.def)             Requested size: 397.48499pt x 228.57967pt.
+ [2 <./figures/staged_training_pipeline_better.png>]
+LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 99.
+ (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/psnfss/ts1ptm.fd
+File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
+) [3] [4]
+Underfull \hbox (badness 8189) in paragraph at lines 204--205
+ []\OT1/ptm/b/n/10 (+20) Dataset and model.[] \OT1/ptm/m/n/10 (+20) We use the Hug-ging Face re-lease of Math-Vista[][][][][] and load
+ []
+
+[5]
+<figures/evolution_panels_notebook_paper.pdf, id=186, 2032.40053pt x 2106.67055pt>
+File: figures/evolution_panels_notebook_paper.pdf Graphic file (type pdf)
+<use figures/evolution_panels_notebook_paper.pdf>
+Package pdftex.def Info: figures/evolution_panels_notebook_paper.pdf  used on input line 274.
+(pdftex.def)             Requested size: 397.47946pt x 412.00455pt.
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [6] [7 <./figures/evolution_panels_notebook_paper.pdf>] [8] (./main.bbl [9]) [10] (./main.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
-Package rerunfilecheck Info: File `staged_metric_gated_grpo_supplement.out' has not changed.
-(rerunfilecheck)             Checksum: 9076F808797BF181F65EE520BFDF8394;1856.
+Package rerunfilecheck Info: File `main.out' has not changed.
+(rerunfilecheck)             Checksum: E538E6EAB025960D9708F0D0F613D96E;3961.
  ) 
 Here is how much of TeX's memory you used:
- 14195 strings out of 469515
- 213124 string characters out of 5469773
- 679602 words of memory out of 5000000
- 42478 multiletter control sequences out of 15000+600000
- 656047 words of font info for 173 fonts, out of 8000000 for 9000
+ 15481 strings out of 469515
+ 237853 string characters out of 5469773
+ 703407 words of memory out of 5000000
+ 43596 multiletter control sequences out of 15000+600000
+ 672570 words of font info for 262 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 75i,16n,90p,1032b,703s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy9.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/urw/times/utmr8a.pfb>
-Output written on staged_metric_gated_grpo_supplement.pdf (5 pages, 166839 bytes).
+ 75i,17n,90p,1427b,587s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on main.pdf (10 pages, 511354 bytes).
 PDF statistics:
- 170 PDF objects out of 1000 (max. 8388607)
- 135 compressed objects within 2 object streams
- 45 named destinations out of 1000 (max. 500000)
- 41025 words of extra memory for PDF output out of 42996 (max. 10000000)
+ 388 PDF objects out of 1000 (max. 8388607)
+ 266 compressed objects within 3 object streams
+ 73 named destinations out of 1000 (max. 500000)
+ 68243 words of extra memory for PDF output out of 74296 (max. 10000000)
 

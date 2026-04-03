@@ -11,6 +11,7 @@
 \usepackage{subcaption}
 \usepackage{enumitem}
 \usepackage{array}
+\graphicspath{{figures/}}
 
 \hypersetup{
   colorlinks=true,
@@ -66,7 +67,7 @@ Figure~\ref{fig:pipeline} summarizes the loop. A base VLM is prepared with LoRA 
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{../../results/plots/staged_training_pipeline_better.png}
+\includegraphics[width=\linewidth]{staged_training_pipeline_better.png}
 \caption{Overview of the staged metric-gated GRPO loop. The pipeline couples phase-specific data curation, GRPO fine-tuning, checkpoint-side evaluation, reward-weight adaptation, and alias-based continuation. The method studied here is the training stack around GRPO rather than a new GRPO loss.}
 \label{fig:pipeline}
 \end{figure}
@@ -270,7 +271,7 @@ Table~\ref{tab:milestones} shows the progression most clearly in the checkpoint-
 
 \begin{figure*}[p]
 \centering
-\includegraphics[width=\textwidth,height=0.9\textheight,keepaspectratio]{../../results/plots/evolution_panels_notebook_paper.pdf}
+\includegraphics[width=\textwidth,height=0.9\textheight,keepaspectratio]{evolution_panels_notebook_paper.pdf}
 \caption{Training evolution across milestone checkpoints. The main qualitative pattern is structure first, correctness later: structural metrics stabilize by the smoke Phase B / Phase C regime, while the 0.75 exact-match milestone appears only after larger continuation.}
 \label{fig:evolution}
 \end{figure*}
@@ -366,6 +367,6 @@ The study remains comparatively reproducible. It logs controller decisions at ev
 We presented staged metric-gated GRPO for visual numeric reasoning in a resource-constrained setting. The checkpoint-side results indicate a consistent progression: structural validity must become reliable before correctness reward becomes consistently informative. A phase-wise curriculum, metric-gated reward controller, and alias-based checkpoint selection transform a malformed, long-output baseline into checkpoints that reach exact match 0.75 while preserving parseability 1.0 and zero truncation on the monitored subset. Smoke-phase runs stabilize structure on \texttt{testmini}, and larger-split Phase C on \texttt{test} delivers the principal correctness improvement. These findings support staged curriculum-based RL as a promising direction for multimodal numeric reasoning under practical compute constraints.
 
 \bibliographystyle{iclr2026_conference}
-\bibliography{staged_metric_gated_grpo_camera_ready}
+\bibliography{references}
 
 \end{document}
