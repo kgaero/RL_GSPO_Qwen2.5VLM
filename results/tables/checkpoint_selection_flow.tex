@@ -1,0 +1,119 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.7in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue
+}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\cell}[1]{\shortstack[l]{#1}}
+\newcommand{\flowbox}[1]{\fcolorbox{black}{gray!8}{\parbox[c][2.0cm][c]{0.21\textwidth}{\centering\footnotesize #1}}}
+
+\begin{document}
+
+\begin{center}
+{\LARGE \textbf{Checkpoint Scoring and Selection Flow}}\\[0.4em]
+{\large Shared helpers, eval metrics, controller updates, score aliases, and report-level keep/discard}\\[0.6em]
+\end{center}
+
+\noindent\textbf{Key distinction.}
+\emph{Keep / discard} is not a training-time controller verdict.
+It is a \emph{report-layer recommendation} built mostly from alias labels plus one hard-coded recommended final checkpoint.
+
+\vspace{0.6em}
+\noindent\textbf{Flow A: runtime eval and controller loop}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{c c c c c}
+\flowbox{Model completions\\ + gold answers} &
+$\rightarrow$ &
+\flowbox{Shared parsing helpers\\ float parse\\ exact-match check\\ solution-tag check\\ reasoning-tag check\\ tolerance check} &
+$\rightarrow$ &
+\flowbox{Eval metrics\\ exact match\\ tolerance accuracy\\ parseable rate\\ tag compliance\\ malformed rate\\ truncation rate} \\
+& & $\searrow$ & & $\downarrow$ \\
+& & & &
+\flowbox{Reward controller\\ metric-gated weight updates\\ parseability guard\\ formatting guard\\ finish guard\\ correctness escalation} \\
+\end{tabular}
+\end{center}
+
+\vspace{0.3em}
+\noindent\textbf{Flow B: checkpoint scoring, aliases, and report recommendation}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{c c c c c}
+\flowbox{Eval metrics} &
+$\rightarrow$ &
+\flowbox{Weighted checkpoint scores\\ \code{structure\_score}\\ \code{correctness\_score}\\ \code{composite\_score}} &
+$\rightarrow$ &
+\flowbox{Run-local aliases\\ \code{latest}\\ \code{best\_structure}\\ \code{best\_correctness}\\ \code{best\_composite}} \\
+& & & & $\downarrow$ \\
+& & & & \flowbox{Report-level\\ \code{Keep / Discard}\\ recommendation} \\
+\end{tabular}
+\end{center}
+
+\vspace{0.5em}
+\noindent\textbf{What drives what}
+
+\renewcommand{\arraystretch}{1.08}
+\setlength{\tabcolsep}{2pt}
+\footnotesize
+\begin{tabularx}{\textwidth}{L{0.17\textwidth} L{0.12\textwidth} L{0.15\textwidth} L{0.17\textwidth} Y}
+\toprule
+\textbf{Stage} & \textbf{Input} & \textbf{Output} & \textbf{Used By} & \textbf{Source / Note} \\
+\midrule
+Shared parsing helpers & completion text, gold answer, answer mode & parsed answer, exact/tolerance predicates, tag predicates, malformed status & reward functions and eval logic & Same helper family is imported in both \code{rewarding.py} and \code{evaluation.py} under \code{staged\_rl/}. \\
+
+Reward functions & parsed completion facts + current reward weights & per-sample reward components and total reward & RL training; eval logging of reward components & Eval also calls reward functions for audit fields, but core eval metrics are computed separately from parsed sample records. \\
+
+Eval metric aggregation & \cell{parsed sample records\\ across prompts/samples} & checkpoint metrics such as exact match, tolerance, parseable rate, tag compliance, malformed rate, truncation rate & controller, checkpoint scoring, reports & This is the main metric layer that later decisions depend on. \\
+
+Reward controller & eval metrics + current weights + gate thresholds & updated reward weights and controller decision record & next training segment in the same phase & Controller decisions are training-time behavior, not report keep/discard labels. \\
+
+Checkpoint scoring & eval metrics + score-weight config & \cell{\code{structure\_score},\\ \code{correctness\_score},\\ \code{composite\_score}} & alias assignment & Weighted sums defined in \code{config.py} under \code{staged\_rl/}. \\
+
+Alias assignment & checkpoint scores + global step order & \cell{\code{best\_structure},\\ \code{best\_correctness},\\ \code{best\_composite},\\ \code{latest}} & resume selectors, report labeling & \code{latest} is newest by step; the three \code{best\_*} aliases are maxima of their respective scores. \\
+
+Report keep/discard & artifact type + alias flags + hard-coded primary final checkpoint & \cell{\code{reference},\\ \code{unavailable},\\ \code{keep\_primary},\\ \code{keep},\\ \code{keep\_secondary},\\ \code{discard}} & master tables and plots & This is presentation/report logic in \cell{\code{scripts/}\\\code{generate\_results\_report.py}}, not controller logic. \\
+\bottomrule
+\end{tabularx}
+
+\vspace{0.7em}
+\noindent\textbf{Exact report-layer keep/discard rule}
+
+\begin{center}
+\footnotesize
+\begin{tabularx}{\textwidth}{L{0.64\textwidth} L{0.18\textwidth}}
+\toprule
+\textbf{Condition} & \textbf{Assigned label} \\
+\midrule
+baseline snapshot & \code{reference} \\
+planned milestone missing from exported artifacts & \code{unavailable} \\
+\cell{checkpoint path equals the\\ hard-coded recommended final checkpoint\\ \code{outputs\_staged\_large\_continue/phase\_c/}\\\code{checkpoint-120}} & \code{keep\_primary} \\
+\code{Is Best Composite} & \code{keep} \\
+\code{Is Best Correctness} or \code{Is Best Structure} & \code{keep\_secondary} \\
+\code{Is Latest} only & \code{discard} \\
+anything else & \code{discard} \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\vspace{0.35em}
+\noindent\textbf{Caveat.}
+The milestone summary section in the report later overrides some selected rows for narrative purposes.
+The rule above is the default master-table keep/discard logic.
+
+\end{document}

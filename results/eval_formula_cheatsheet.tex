@@ -15,7 +15,9 @@
 \maketitle
 
 \section*{Source of Truth}
-\texttt{staged\_rl/parsing.py}, \texttt{staged\_rl/rewarding.py}, \texttt{staged\_rl/evaluation.py}, \texttt{staged\_rl/checkpointing.py}, \texttt{staged\_rl/config.py}
+\texttt{staged\_rl/parsing.py}, \texttt{staged\_rl/rewarding.py}, \\
+\texttt{staged\_rl/evaluation.py}, \texttt{staged\_rl/checkpointing.py}, \\
+\texttt{staged\_rl/config.py}
 
 \section*{Notation}
 Let:
@@ -116,9 +118,11 @@ For numeric free-form:
 \mathrm{Parseable}_{i,j}
 =
 \ind\!\left[
-\mathrm{parse\_numeric\_solution}(c_{i,j}) \neq \None
-\;\wedge\;
+\begin{aligned}
+&\mathrm{parse\_numeric\_solution}(c_{i,j}) \neq \None \\
+&\wedge\;
 \mathrm{parse\_float\_safe}(\mathrm{parse\_numeric\_solution}(c_{i,j})) \neq \None
+\end{aligned}
 \right].
 \]
 
@@ -137,11 +141,11 @@ For numeric free-form:
 \mathrm{Malformed}_{i,j}
 =
 \ind\!\left[
-\#\mathrm{SolutionBlocks}(c_{i,j}) \neq 1
-\;\vee\;
-\mathrm{solution\_text}(c_{i,j}) = \varnothing
-\;\vee\;
-\mathrm{parse\_float\_safe}(\mathrm{solution\_text}(c_{i,j})) = \None
+\begin{aligned}
+&\#\mathrm{SolutionBlocks}(c_{i,j}) \neq 1 \\
+&\vee\; \mathrm{solution\_text}(c_{i,j}) = \varnothing \\
+&\vee\; \mathrm{parse\_float\_safe}(\mathrm{solution\_text}(c_{i,j})) = \None
+\end{aligned}
 \right].
 \]
 
@@ -418,35 +422,47 @@ For metric vector $m$ and weight vector $w$:
 
 \subsection*{Structure score}
 \[
+\begin{aligned}
 \mathrm{structure\_score}
-=
+&=
 0.35 \cdot \mathrm{parseable\_answer\_rate}
-+ 0.20 \cdot \mathrm{solution\_tag\_compliance}
++ 0.20 \cdot \mathrm{solution\_tag\_compliance} \\
+&\quad
 + 0.20 \cdot \mathrm{reasoning\_tag\_compliance}
-- 0.15 \cdot \mathrm{malformed\_answer\_rate}
+- 0.15 \cdot \mathrm{malformed\_answer\_rate} \\
+&\quad
 - 0.10 \cdot \mathrm{truncation\_rate}.
+\end{aligned}
 \]
 
 \subsection*{Correctness score}
 \[
+\begin{aligned}
 \mathrm{correctness\_score}
-=
+&=
 0.70 \cdot \mathrm{normalized\_exact\_match}
-+ 0.20 \cdot \mathrm{tolerance\_accuracy}
++ 0.20 \cdot \mathrm{tolerance\_accuracy} \\
+&\quad
 + 0.10 \cdot \mathrm{parseable\_answer\_rate}.
+\end{aligned}
 \]
 
 \subsection*{Composite score}
 \[
+\begin{aligned}
 \mathrm{composite\_score}
-=
+&=
 0.45 \cdot \mathrm{normalized\_exact\_match}
-+ 0.15 \cdot \mathrm{tolerance\_accuracy}
++ 0.15 \cdot \mathrm{tolerance\_accuracy} \\
+&\quad
 + 0.15 \cdot \mathrm{parseable\_answer\_rate}
-+ 0.10 \cdot \mathrm{solution\_tag\_compliance}
++ 0.10 \cdot \mathrm{solution\_tag\_compliance} \\
+&\quad
 + 0.05 \cdot \mathrm{reasoning\_tag\_compliance}
-- 0.05 \cdot \mathrm{malformed\_answer\_rate}
+- 0.05 \cdot \mathrm{malformed\_answer\_rate} \\
+&\quad
 - 0.05 \cdot \mathrm{truncation\_rate}.
+\end{aligned}
 \]
 
 \section*{6. Derived Display Metric Used in Results Reporting}
@@ -459,19 +475,21 @@ For metric vector $m$ and weight vector $w$:
 \section*{7. Failure Mode Labeling}
 Per sample, failure mode is assigned by first match in this order:
 \[
-\mathrm{truncation}
+\begin{aligned}
+&\mathrm{truncation}
 \;\to\;
 \mathrm{missing\_solution\_tag}
 \;\to\;
-\mathrm{missing\_reasoning\_tag}
-\;\to\;
+\mathrm{missing\_reasoning\_tag} \\
+&\to\;
 \mathrm{malformed\_answer}
 \;\to\;
 \mathrm{unparseable\_answer}
 \;\to\;
-\mathrm{parseable\_but\_wrong}
-\;\to\;
+\mathrm{parseable\_but\_wrong} \\
+&\to\;
 \mathrm{exact\_match}.
+\end{aligned}
 \]
 
 Equivalent piecewise form:

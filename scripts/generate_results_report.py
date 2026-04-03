@@ -1529,18 +1529,21 @@ STAGE_DISPLAY = {
     "stage1_easy_numeric": "Stage 1\nEasy Numeric",
     "stage2_float_numeric": "Stage 2\nMedium / Float",
     "stage3_hard_numeric": "Stage 3\nHard Numeric",
+    "stage4_multi_choice": "Stage 4\nMulti-Choice",
 }
 
 STAGE_SHORT = {
     "stage1_easy_numeric": "S1",
     "stage2_float_numeric": "S2",
     "stage3_hard_numeric": "S3",
+    "stage4_multi_choice": "S4",
 }
 
 STAGE_COLORS = {
     "stage1_easy_numeric": "#4c78a8",
     "stage2_float_numeric": "#f58518",
     "stage3_hard_numeric": "#e45756",
+    "stage4_multi_choice": "#54a24b",
 }
 
 RUN_FAMILY_COLORS = {
@@ -1554,6 +1557,17 @@ SPLIT_DISPLAY = {
     "unknown_pre_refactor": "unknown",
     "testmini": "testmini",
     "test": "test",
+}
+
+SPLIT_EXAMPLE_COUNTS = {
+    "testmini": 1000,
+    "test": 5141,
+}
+
+ALLUVIAL_STAGE_RIGHT_LABELS = {
+    "stage1_easy_numeric": "Easy Numeric",
+    "stage2_float_numeric": "Medium / Float Numeric",
+    "stage3_hard_numeric": "Hard Numeric",
 }
 
 
@@ -3454,8 +3468,8 @@ def draw_curriculum_alluvial_ax(
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
 
-    split_x, phase_x, stage_x = 0.12, 0.48, 0.84
-    node_width = 0.10
+    split_x, phase_x, stage_x = 0.15, 0.47, 0.82
+    node_width = 0.105
 
     split_cursor = {name: split_positions[name][1] for name in split_order}
     phase_left_cursor = {name: phase_positions[name][1] for name in phase_order}
@@ -3508,6 +3522,15 @@ def draw_curriculum_alluvial_ax(
                 color=STAGE_COLORS[stage_name],
                 alpha=0.58,
             )
+            ax.text(
+                phase_x + node_width / 2 + 0.012,
+                (phase_top + phase_bottom) / 2,
+                f"{weight:.0%}",
+                ha="left",
+                va="center",
+                fontsize=11,
+                color="#111111",
+            )
 
     for split_name in split_order:
         y0, y1 = split_positions[split_name]
@@ -3522,6 +3545,17 @@ def draw_curriculum_alluvial_ax(
             )
         )
         ax.text(split_x, (y0 + y1) / 2, split_name, ha="center", va="center", fontsize=9, fontweight="bold")
+        example_count = SPLIT_EXAMPLE_COUNTS.get(split_name)
+        if example_count is not None:
+            ax.text(
+                split_x - node_width / 2 - 0.055,
+                (y0 + y1) / 2,
+                f"{example_count:,}\nexamples",
+                ha="right",
+                va="center",
+                fontsize=20,
+                color="#111111",
+            )
 
     for row in rows:
         y0, y1 = phase_positions[row["Milestone ID"]]
@@ -3537,7 +3571,15 @@ def draw_curriculum_alluvial_ax(
             )
         )
         label = row["Phase Label"].replace("Phase ", "P")
-        ax.text(phase_x, (y0 + y1) / 2, textwrap.fill(label, width=12), ha="center", va="center", fontsize=8.3)
+        ax.text(
+            phase_x,
+            (y0 + y1) / 2,
+            textwrap.fill(label, width=12),
+            ha="center",
+            va="center",
+            fontsize=9.2,
+            color="#222222",
+        )
 
     for stage_name in stage_order:
         y0, y1 = stage_positions[stage_name]
@@ -3562,11 +3604,22 @@ def draw_curriculum_alluvial_ax(
             fontsize=8.4,
             fontweight="bold",
         )
+        ax.text(
+            stage_x + node_width / 2 + 0.01,
+            (y0 + y1) / 2,
+            ALLUVIAL_STAGE_RIGHT_LABELS.get(stage_name, stage_name),
+            ha="left",
+            va="center",
+            fontsize=19,
+            fontweight="medium",
+            fontfamily="monospace",
+            color="#111111",
+        )
 
-    ax.text(split_x, 0.985, "Train Split", ha="center", va="top", fontsize=10, fontweight="bold")
-    ax.text(phase_x, 0.985, "Phase Instance", ha="center", va="top", fontsize=10, fontweight="bold")
-    ax.text(stage_x, 0.985, "Curriculum Stage", ha="center", va="top", fontsize=10, fontweight="bold")
-    ax.set_title(title, loc="left", fontsize=title_size)
+    ax.text(split_x, 0.985, "Train Split", ha="center", va="top", fontsize=11, fontweight="bold")
+    ax.text(phase_x, 0.985, "Phase Instance", ha="center", va="top", fontsize=11, fontweight="bold")
+    ax.text(stage_x, 0.985, "Curriculum Stage", ha="center", va="top", fontsize=11, fontweight="bold")
+    ax.set_title(title, loc="left", fontsize=16)
 
     if show_note:
         ax.text(

@@ -52,15 +52,16 @@ Token count is computed as tokenizer-encoded length when a tokenizer is availabl
 \subsection*{Malformed answer}
 For numeric free-form:
 \[
+\begin{aligned}
 \mathrm{Malformed}(c,\texttt{numeric\_free\_form})
-=
-\ind\!\left[
+=\;&\ind\!\left[
 \#\mathrm{SolutionBlocks}(c)\neq 1
 \;\vee\;
-\mathrm{solution\_text}(c)=\varnothing
-\;\vee\;
+\mathrm{solution\_text}(c)=\varnothing \right. \\
+&\left. \;\vee\;
 \mathrm{parse\_float\_safe}(\mathrm{solution\_text}(c))=\None
 \right].
+\end{aligned}
 \]
 
 For multi-choice:
@@ -161,13 +162,14 @@ R_{\mathrm{format}}(c,m)
 \subsection*{Parseable reward}
 For numeric free-form:
 \[
+\begin{aligned}
 R_{\mathrm{parseable}}(c,\texttt{numeric\_free\_form})
-=
-\ind\!\left[
-\mathrm{solution\_text}(c)\neq \None
-\;\wedge\;
+=\;&\ind\!\left[
+\mathrm{solution\_text}(c)\neq \None \right. \\
+&\left. \;\wedge\;
 \mathrm{parse\_float\_safe}(\mathrm{solution\_text}(c))\neq \None
 \right].
+\end{aligned}
 \]
 
 For multi-choice:
@@ -228,14 +230,16 @@ R_{\mathrm{tolerance}}(c,g,m,p,\phi)
 \section*{4. Total Reward}
 The runtime builds reward functions in this fixed order:
 \[
-[
-\texttt{format\_reward},
+\begin{aligned}
+\relax[
+&\texttt{format\_reward},
 \texttt{parseable\_reward},
-\texttt{finished\_reward},
-\texttt{correctness\_reward},
+\texttt{finished\_reward}, \\
+&\texttt{correctness\_reward},
 \texttt{brevity\_reward},
 \texttt{tolerance\_reward}
 ].
+\end{aligned}
 \]
 
 Let the current weights be

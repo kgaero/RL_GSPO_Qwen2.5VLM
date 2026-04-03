@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.3.30)  30 MAR 2026 18:40
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.3.30)  1 APR 2026 16:24
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -126,8 +126,7 @@ Package: inputenc 2024/02/08 v1.3d Input encoding file
 ) (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
 File: l3backend-pdftex.def 2025-10-09 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count298
-)
-No file reward_formula_cheatsheet.aux.
+) (results/reward_formula_cheatsheet.aux)
 \openout1 = `reward_formula_cheatsheet.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 11.
@@ -144,6 +143,7 @@ LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 11.
 LaTeX Font Info:    ... okay on input line 11.
 LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 11.
 LaTeX Font Info:    ... okay on input line 11.
+
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
 *geometry* verbose mode - [ preamble ] result:
@@ -185,39 +185,24 @@ File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 LaTeX Font Info:    Trying to load font information for U+msb on input line 16.
  (/home/kgaer/.TinyTeX/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
-)
-Overfull \hbox (187.33682pt too wide) detected at line 64
-[]\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 c; []\OT1/cmr/m/n/10.95 ) = \OT1/cmr/bx/n/10.95 1  [] \OML/cmm/m/it/10.95 :
- []
+) [1
 
-[1
-
-{/home/kgaer/.TinyTeX/texmf-var/fonts/map/pdftex/updmap/pdftex.map}]
-Overfull \hbox (63.5751pt too wide) detected at line 171
-\OML/cmm/m/it/10.95 R[]\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 c; []\OT1/cmr/m/n/10.95 ) = \OT1/cmr/bx/n/10.95 1  [] \OML/cmm/m/it/10.95 :
- []
-
-[2]
-Overfull \hbox (84.27332pt too wide) detected at line 239
-\OT1/cmr/m/n/10.95 [[]\OML/cmm/m/it/10.95 ; []; []; []; []; []\OT1/cmr/m/n/10.95 ]\OML/cmm/m/it/10.95 :
- []
-
-[3] [4] [5] [6] (results/reward_formula_cheatsheet.aux)
+{/home/kgaer/.TinyTeX/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] [2] [3] [4] [5] [6] (results/reward_formula_cheatsheet.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 2586 strings out of 469515
- 36089 string characters out of 5469773
+ 2591 strings out of 469515
+ 36263 string characters out of 5469773
  451756 words of memory out of 5000000
- 31242 multiletter control sequences out of 15000+600000
+ 31245 multiletter control sequences out of 15000+600000
  642274 words of font info for 79 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 57i,10n,65p,253b,221s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 57i,11n,65p,253b,221s stack positions out of 10000i,1000n,20000p,200000b,200000s
  </home/kgaer/.TinyTeX/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1200.600pk> </home/kgaer/.TinyTeX/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1095.600pk> </home/kgaer/.TinyTeX/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1095.600pk> </home/kgaer/.TinyTeX/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1095.600pk> </home/kgaer/.TinyTeX/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1440.600pk> </home/kgaer/.TinyTeX/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1728.600pk></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></home/kgaer/.TinyTeX/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on results/reward_formula_cheatsheet.pdf (6 pages, 153156 bytes).
+Output written on results/reward_formula_cheatsheet.pdf (6 pages, 153233 bytes).
 PDF statistics:
  260 PDF objects out of 1000 (max. 8388607)
  65 compressed objects within 1 object stream
