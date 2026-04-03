@@ -1,0 +1,21 @@
+{
+  "id": "mcgmcg1/rl-gspo-qwen2-5vlm-testmini-reeval-large-phased",
+  "title": "RL GSPO Qwen2 5VLM Testmini Reeval Large PhaseD",
+  "code_file": "kaggle_full_testmini_reeval_large_and_phase_d.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "true",
+  "enable_gpu": "true",
+  "enable_tpu": "false",
+  "enable_internet": "true",
+  "machine_shape": "NvidiaTeslaT4",
+  "dataset_sources": [
+    "mcgmcg1/rl-gspo-qwen2-5vlm-reeval-code-v2"
+  ],
+  "competition_sources": [],
+  "kernel_sources": [
+    "mcgmcg1/rl-gspo-qwen2-5vlm-large-split-continue",
+    "mcgmcg1/rl-gspo-qwen2-5vlm-phase-d-large-continue"
+  ],
+  "model_sources": []
+}

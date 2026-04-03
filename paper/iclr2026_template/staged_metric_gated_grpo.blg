@@ -1,0 +1,46 @@
+This is BibTeX, Version 0.99e (TeX Live 2026)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: staged_metric_gated_grpo.aux
+The style file: iclr2026_conference.bst
+Database file #1: staged_metric_gated_grpo.bib
+You've used 7 entries,
+            2773 wiz_defined-function locations,
+            623 strings with 7455 characters,
+and the built_in function-call counts, 6232 in all, are:
+= -- 438
+> -- 767
+< -- 0
++ -- 256
+- -- 249
+* -- 625
+:= -- 1044
+add.period$ -- 26
+call.type$ -- 7
+change.case$ -- 103
+chr.to.int$ -- 7
+cite$ -- 14
+duplicate$ -- 152
+empty$ -- 272
+format.name$ -- 256
+if$ -- 1214
+int.to.chr$ -- 1
+int.to.str$ -- 1
+missing$ -- 5
+newline$ -- 48
+num.names$ -- 28
+pop$ -- 227
+preamble$ -- 1
+purify$ -- 96
+quote$ -- 0
+skip$ -- 170
+stack$ -- 0
+substring$ -- 14
+swap$ -- 12
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 77
+warning$ -- 0
+while$ -- 21
+width$ -- 0
+write$ -- 101

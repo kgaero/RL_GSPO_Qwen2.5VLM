@@ -2,7 +2,7 @@
 
 import unittest
 
-from staged_rl.evaluation import aggregate_subset_metrics, determine_failure_mode
+from staged_rl.evaluation import aggregate_subset_metrics, determine_failure_mode, select_overall_metrics
 
 
 class EvaluationTests(unittest.TestCase):
@@ -45,6 +45,21 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(metrics["normalized_exact_match"], 1.0)
         self.assertEqual(metrics["best_of_k_accuracy"], 1.0)
         self.assertIn("reward_component/format_reward_mean", metrics)
+
+    def test_select_overall_metrics_prefers_full_split_when_present(self):
+        subset_results = {
+            "eval_full_split": {"metrics": {"normalized_exact_match": 0.5}},
+            "stage1_easy_numeric": {"metrics": {"normalized_exact_match": 1.0}},
+        }
+        metrics = select_overall_metrics(subset_results)
+        self.assertEqual(metrics["normalized_exact_match"], 0.5)
+
+    def test_select_overall_metrics_falls_back_to_single_subset(self):
+        subset_results = {
+            "custom_subset": {"metrics": {"normalized_exact_match": 0.25}},
+        }
+        metrics = select_overall_metrics(subset_results)
+        self.assertEqual(metrics["normalized_exact_match"], 0.25)
 
 
 if __name__ == "__main__":

@@ -1613,6 +1613,7 @@ def stage_mix_vector(stage_mix_text: str) -> list[float]:
 def save_plot_dual(fig: Any, stem: str) -> None:
     fig.savefig(PLOTS_DIR / f"{stem}.png", dpi=220, bbox_inches="tight")
     fig.savefig(PLOTS_DIR / f"{stem}.svg", bbox_inches="tight")
+    fig.savefig(PLOTS_DIR / f"{stem}.pdf", bbox_inches="tight")
 
 
 def plot_main_evolution(
@@ -1620,6 +1621,7 @@ def plot_main_evolution(
     *,
     stem: str = "evolution_panels",
     include_notebook_panel: bool = False,
+    paper_layout: bool = False,
 ) -> None:
     import matplotlib
 
@@ -1820,17 +1822,60 @@ def plot_main_evolution(
             }
         )
 
-    fig, axes = plt.subplots(
-        14 if include_notebook_panel else 13,
-        1,
-        figsize=(22, 46 if include_notebook_panel else 43),
-        sharex=True,
-        gridspec_kw={
-            "height_ratios": height_ratios,
-            "hspace": 0.10,
-        },
-    )
-    fig.subplots_adjust(right=0.84, top=0.955, bottom=0.045)
+    if paper_layout:
+        fig, axes_grid = plt.subplots(
+            7,
+            2,
+            figsize=(28, 30 if include_notebook_panel else 28),
+            sharex=True,
+            gridspec_kw={
+                "height_ratios": [1.0, 1.0, 1.0, 1.0, 1.15, 0.95, 1.0],
+                "hspace": 0.30,
+                "wspace": 0.30,
+            },
+        )
+        axes = list(axes_grid.ravel())
+        fig.subplots_adjust(left=0.065, right=0.985, top=0.962, bottom=0.072)
+    else:
+        fig, axes = plt.subplots(
+            14 if include_notebook_panel else 13,
+            1,
+            figsize=(22, 46 if include_notebook_panel else 43),
+            sharex=True,
+            gridspec_kw={
+                "height_ratios": height_ratios,
+                "hspace": 0.10,
+            },
+        )
+        fig.subplots_adjust(right=0.84, top=0.955, bottom=0.045)
+
+    axis_positions = {id(ax): index for index, ax in enumerate(axes)}
+
+    def panel_column(ax: Any) -> int:
+        return axis_positions.get(id(ax), 0) % 2 if paper_layout else 0
+
+    def legend_anchor(ax: Any) -> tuple[str, dict[str, Any]]:
+        if not paper_layout:
+            return "upper left", {
+                "bbox_to_anchor": (1.01, 1.0),
+                "borderaxespad": 0.0,
+                "frameon": False,
+            }
+        if panel_column(ax) == 0:
+            return "upper left", {
+                "borderaxespad": 0.28,
+                "frameon": True,
+                "framealpha": 0.92,
+                "facecolor": "white",
+                "edgecolor": "#cfcfcf",
+            }
+        return "upper right", {
+            "borderaxespad": 0.28,
+            "frameon": True,
+            "framealpha": 0.92,
+            "facecolor": "white",
+            "edgecolor": "#cfcfcf",
+        }
 
     segments: list[tuple[int, int, str]] = []
     if plot_rows:
@@ -1991,7 +2036,8 @@ def plot_main_evolution(
     ]
 
     for index, (ax, title, series_specs, step_mode, y_label) in enumerate(panel_specs):
-        add_segments(ax, label_position="top" if index == 0 else None)
+        top_labeled_indices = {0, 1} if paper_layout else {0}
+        add_segments(ax, label_position="top" if index in top_labeled_indices else None)
         if title == "Generation Length / Reward":
             left_key, left_color = series_specs[0]
             right_key, right_color = series_specs[1]
@@ -2009,11 +2055,15 @@ def plot_main_evolution(
                 Line2D([0], [0], color=left_color, marker="o", linewidth=2, label=left_key),
                 Line2D([0], [0], color=right_color, marker="o", linewidth=2, label=right_key),
             ]
-            ax.legend(handles=legend_items, loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, borderaxespad=0.0)
+            legend_loc, legend_kwargs = legend_anchor(ax)
+            ax.legend(handles=legend_items, loc=legend_loc, fontsize=7.2 if paper_layout else 8, **legend_kwargs)
         elif title == "Rule Triggers":
             ax.set_ylabel("rule")
             ax.set_yticks(range(len(rule_heatmap_specs)))
-            ax.set_yticklabels([label for _, label in rule_heatmap_specs], fontsize=8)
+            if paper_layout:
+                ax.set_yticklabels([wrap_axis_label(column_name, width=14) for column_name, _ in rule_heatmap_specs], fontsize=7.2)
+            else:
+                ax.set_yticklabels([label for _, label in rule_heatmap_specs], fontsize=8)
             ax.set_ylim(-0.5, len(rule_heatmap_specs) - 0.5)
             ax.invert_yaxis()
             for row in plot_rows:
@@ -2047,13 +2097,14 @@ def plot_main_evolution(
                 )
                 for column_name, label in rule_heatmap_specs
             ]
-            ax.legend(
-                handles=rule_legend_items,
-                loc="upper left",
-                bbox_to_anchor=(1.01, 1.0),
-                fontsize=7.5,
-                borderaxespad=0.0,
-            )
+            if not paper_layout:
+                ax.legend(
+                    handles=rule_legend_items,
+                    loc="upper left",
+                    bbox_to_anchor=(1.01, 1.0),
+                    fontsize=7.5,
+                    borderaxespad=0.0,
+                )
         elif title == "Weight Deltas - controller applied":
             ax.set_ylabel("")
             ax.set_yticks(range(len(delta_heatmap_specs)))
@@ -2147,7 +2198,8 @@ def plot_main_evolution(
             ax.set_ylabel("split")
             ax.set_yticks([0, 1, 2])
             ax.set_yticklabels(["unknown", "testmini", "test"])
-            ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, borderaxespad=0.0)
+            legend_loc, legend_kwargs = legend_anchor(ax)
+            ax.legend(loc=legend_loc, fontsize=7.2 if paper_layout else 8, **legend_kwargs)
         else:
             for key, color in series_specs:
                 values = extract_series(key)
@@ -2165,9 +2217,10 @@ def plot_main_evolution(
                     ax.plot(x, values, marker="o", label=key, color=color, linewidth=2)
             ax.set_ylabel(y_label)
             if series_specs:
-                ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, borderaxespad=0.0)
-        title_y = 1.005 if index == 0 else 1.0
-        ax.set_title(title, fontsize=12, loc="left", y=title_y)
+                legend_loc, legend_kwargs = legend_anchor(ax)
+                ax.legend(loc=legend_loc, fontsize=7.0 if paper_layout else 8, **legend_kwargs)
+        title_y = 1.01 if paper_layout else (1.005 if index == 0 else 1.0)
+        ax.set_title(title, fontsize=10.5 if paper_layout else 12, loc="left", y=title_y)
         ax.grid(True, axis="y", alpha=0.25)
         if title in {"Reward Weight Evolution", "Reward Weight Evolution continued"}:
             ax.set_ylim(0.0, 8.01)
@@ -2232,13 +2285,13 @@ def plot_main_evolution(
     decision_ax.set_yticks([0.0, 0.5, 1.0])
     decision_ax.set_yticklabels(["discard", "reference", "keep"])
     decision_ax.set_ylim(-0.15, 1.2)
-    decision_ax.set_title("Checkpoint Decisions / Alias Roles", fontsize=12, loc="left")
+    decision_ax.set_title("Checkpoint Decisions / Alias Roles", fontsize=10.5 if paper_layout else 12, loc="left")
     decision_ax.grid(True, axis="y", alpha=0.25)
-    if include_notebook_panel:
+    if include_notebook_panel and not paper_layout:
         decision_ax.tick_params(axis="x", labelbottom=False)
     else:
         decision_ax.set_xticks(x)
-        decision_ax.set_xticklabels(x_tick_labels, rotation=60, ha="right", fontsize=8)
+        decision_ax.set_xticklabels(x_tick_labels, rotation=55 if paper_layout else 60, ha="right", fontsize=7 if paper_layout else 8)
     alias_legend_items = [
         Line2D([0], [0], marker="*", color="w", label="best_composite", markerfacecolor="black", markeredgecolor="black", markersize=12),
         Line2D([0], [0], marker="D", color="w", label="best_correctness", markerfacecolor="black", markeredgecolor="black", markersize=9),
@@ -2252,21 +2305,46 @@ def plot_main_evolution(
         Line2D([0], [0], marker="o", color="w", label="reference", markerfacecolor="#7f7f7f", markeredgecolor="black", markersize=9),
         Line2D([0], [0], marker="o", color="w", label="discard", markerfacecolor="#d62728", markeredgecolor="black", markersize=9),
     ]
-    alias_legend = decision_ax.legend(
-        handles=alias_legend_items,
-        loc="upper left",
-        bbox_to_anchor=(1.01, 1.0),
-        fontsize=8,
-        borderaxespad=0.0,
-    )
-    decision_ax.add_artist(alias_legend)
-    decision_ax.legend(
-        handles=decision_legend_items,
-        loc="upper left",
-        bbox_to_anchor=(1.01, 0.52),
-        fontsize=8,
-        borderaxespad=0.0,
-    )
+    if paper_layout:
+        alias_legend = decision_ax.legend(
+            handles=alias_legend_items,
+            loc="upper left",
+            fontsize=6.8,
+            ncol=3,
+            frameon=True,
+            framealpha=0.92,
+            facecolor="white",
+            edgecolor="#cfcfcf",
+            borderaxespad=0.28,
+        )
+        decision_ax.add_artist(alias_legend)
+        decision_ax.legend(
+            handles=decision_legend_items,
+            loc="lower left",
+            fontsize=6.8,
+            ncol=2,
+            frameon=True,
+            framealpha=0.92,
+            facecolor="white",
+            edgecolor="#cfcfcf",
+            borderaxespad=0.28,
+        )
+    else:
+        alias_legend = decision_ax.legend(
+            handles=alias_legend_items,
+            loc="upper left",
+            bbox_to_anchor=(1.01, 1.0),
+            fontsize=8,
+            borderaxespad=0.0,
+        )
+        decision_ax.add_artist(alias_legend)
+        decision_ax.legend(
+            handles=decision_legend_items,
+            loc="upper left",
+            bbox_to_anchor=(1.01, 0.52),
+            fontsize=8,
+            borderaxespad=0.0,
+        )
 
     if include_notebook_panel:
         notebook_ax = axes[13]
@@ -2285,7 +2363,7 @@ def plot_main_evolution(
         )
         notebook_ax.set_ylabel("")
         notebook_ax.set_yticks(range(len(notebook_order)))
-        notebook_ax.set_yticklabels([wrap_axis_label(label, width=18) for label in notebook_order], fontsize=7)
+        notebook_ax.set_yticklabels([wrap_axis_label(label, width=14 if paper_layout else 18) for label in notebook_order], fontsize=6.6 if paper_layout else 7)
         notebook_ax.yaxis.tick_right()
         notebook_ax.yaxis.set_label_position("right")
         notebook_ax.tick_params(axis="y", labelright=True, labelleft=False, pad=8)
@@ -2294,10 +2372,10 @@ def plot_main_evolution(
             tick_label.set_linespacing(0.9)
         notebook_ax.set_ylim(-0.5, len(notebook_order) - 0.5)
         notebook_ax.invert_yaxis()
-        notebook_ax.set_title("Notebook Evolution", fontsize=12, loc="left")
+        notebook_ax.set_title("Notebook Evolution", fontsize=10.5 if paper_layout else 12, loc="left")
         notebook_ax.grid(False, axis="y")
         notebook_ax.set_xticks(x)
-        notebook_ax.set_xticklabels(x_tick_labels, rotation=60, ha="right", fontsize=8)
+        notebook_ax.set_xticklabels(x_tick_labels, rotation=55 if paper_layout else 60, ha="right", fontsize=7 if paper_layout else 8)
         dataset_arrow_color = "#8c7a00"
         dataset_node_fill = "#fff3bf"
         dataset_node_edge = "#5c5200"
@@ -2364,7 +2442,7 @@ def plot_main_evolution(
                 textcoords="data",
                 ha="center",
                 va="center",
-                fontsize=6.8,
+                fontsize=6.1 if paper_layout else 6.8,
                 linespacing=0.95,
                 bbox={
                     "boxstyle": "round,pad=0.24",
@@ -2408,7 +2486,7 @@ def plot_main_evolution(
                 textcoords="data",
                 ha="center",
                 va="center",
-                fontsize=6.8,
+                fontsize=6.1 if paper_layout else 6.8,
                 linespacing=0.95,
                 bbox={
                     "boxstyle": "round,pad=0.24",
@@ -2420,18 +2498,21 @@ def plot_main_evolution(
             )
             label_annotation.set_zorder(6)
 
+    if paper_layout and not include_notebook_panel:
+        axes[-1].axis("off")
+
     fig.suptitle(
         "RL Fine-Tuning Evolution Across Smoke, Large-Split, and Dedicated Phase D Runs",
-        fontsize=16,
-        y=0.982,
+        fontsize=17 if paper_layout else 16,
+        y=0.985 if paper_layout else 0.982,
     )
     fig.text(
         0.5,
-        0.014,
+        0.02 if paper_layout else 0.014,
         "Eval coverage per subset is tiny (2 for smoke runs, 4 for larger runs), so many metrics are strongly quantized.",
         ha="center",
         va="bottom",
-        fontsize=10,
+        fontsize=9 if paper_layout else 10,
         color="#555555",
     )
     save_plot_dual(fig, stem)
@@ -4030,6 +4111,12 @@ def main() -> None:
 
     plot_main_evolution(all_rows)
     plot_main_evolution(all_rows, stem="evolution_panels_notebook", include_notebook_panel=True)
+    plot_main_evolution(
+        all_rows,
+        stem="evolution_panels_notebook_paper",
+        include_notebook_panel=True,
+        paper_layout=True,
+    )
     plot_base_vs_final_improvement(all_rows)
     plot_curriculum_map(milestone_rows)
     plot_phase_stage_heatmap(milestone_rows)

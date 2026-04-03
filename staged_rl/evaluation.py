@@ -91,6 +91,19 @@ def aggregate_subset_metrics(per_prompt_records: list[dict[str, Any]], all_sampl
     return metrics
 
 
+def select_overall_metrics(subset_results: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    """Choose the primary metric block from one or more evaluated subsets."""
+
+    if "eval_overall_numeric" in subset_results:
+        return dict(subset_results["eval_overall_numeric"].get("metrics", {}))
+    if "eval_full_split" in subset_results:
+        return dict(subset_results["eval_full_split"].get("metrics", {}))
+    if len(subset_results) == 1:
+        only_payload = next(iter(subset_results.values()))
+        return dict(only_payload.get("metrics", {}))
+    return {}
+
+
 def _sample_reward_components(
     reward_funcs: list[Callable[..., list[float]]],
     reward_weights: Mapping[str, float],
@@ -291,8 +304,7 @@ def evaluate_checkpoint(
             eval_config=eval_config,
         )
 
-    overall_key = "eval_overall_numeric"
-    overall_metrics = subset_results[overall_key]["metrics"] if overall_key in subset_results else {}
+    overall_metrics = select_overall_metrics(subset_results)
     subset_metrics = {name: payload["metrics"] for name, payload in subset_results.items()}
     return {
         "metrics": overall_metrics,

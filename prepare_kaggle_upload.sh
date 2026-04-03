@@ -8,12 +8,24 @@ mkdir -p "$OUT_DIR"
 
 rsync -av \
   --exclude .git \
+  --exclude .venv \
+  --exclude .venv-* \
+  --exclude .mypy_cache \
+  --exclude .pytest_cache \
+  --exclude .ruff_cache \
   --exclude outputs \
   --exclude outputs_staged \
   --exclude grpo_lora \
   --exclude grpo_eval_outputs \
   --exclude grpo_trainer_lora_model \
   --exclude unsloth_compiled_cache \
+  --exclude kaggle_uploads \
+  --exclude paper \
+  --exclude results \
+  --exclude '*.docx' \
+  --exclude '*.pptx' \
+  --exclude 'PRD.md' \
+  --exclude 'RLcurriculum.md' \
   --exclude __pycache__ \
   --exclude '*.safetensors' \
   --exclude '*.pt' \
