@@ -17,6 +17,8 @@ The repository does not currently establish broad empirical claims across seeds,
 
 ## Highlights
 
+Practical repo highlights:
+
 - Explicit staged curriculum over filtered numeric subsets of `AI4Math/MathVista`
 - Metric-gated reward controller with structure floors and correctness escalation
 - Named checkpoint aliases: `latest`, `best_structure`, `best_correctness`, `best_composite`
@@ -25,6 +27,8 @@ The repository does not currently establish broad empirical claims across seeds,
 - Lightweight test suite covering config, controller, parsing, evaluation, checkpointing, and runtime helpers
 
 ## Method Overview
+
+Core components at a glance:
 
 The staged pipeline is defined in [staged_rl/config.py](staged_rl/config.py) and executed by [rl_gspo_qwen2_5vlm_test3.py](rl_gspo_qwen2_5vlm_test3.py).
 
@@ -65,6 +69,8 @@ After each checkpoint evaluation, the controller adjusts weights using held-out 
 
 ## Archived Results
 
+Archived run snapshot:
+
 From [results/report_summary.md](results/report_summary.md):
 
 - Recommended final checkpoint: `outputs_staged_large_continue/phase_c/checkpoint-120`
@@ -88,6 +94,8 @@ README_staged_rl.md             Short runbook for staged phase commands
 
 ## Environment
 
+What you need to run the project:
+
 There is no pinned environment file or lockfile in the repository at the moment. The runtime code expects a Python environment with the following major packages available:
 
 - `torch`
@@ -105,6 +113,8 @@ This codebase is oriented around GPU-backed execution. The training path assumes
 
 ## Data And Base Model
 
+Primary upstream assets:
+
 - Dataset: `AI4Math/MathVista`
   - https://huggingface.co/datasets/AI4Math/MathVista
 - Base model: `Qwen2.5-VL-7B-Instruct`
@@ -117,7 +127,7 @@ Default split settings in the refactored runner are:
 
 Those defaults are defined in [staged_rl/config.py](staged_rl/config.py).
 
-## Quickstart
+## Quickstart 🚀
 
 ### 1. Run Phase A
 
@@ -165,7 +175,7 @@ python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_a --dataset-analysis-only
 python3 rl_gspo_qwen2_5vlm_test3.py --phase phase_e --enable-multichoice-training
 ```
 
-## Kaggle T4 Profile
+## Kaggle T4 Profile 💻
 
 The `kaggle_t4` profile keeps the same staged pipeline but reduces runtime pressure for smaller GPUs. In [staged_rl/config.py](staged_rl/config.py), it changes:
 
@@ -183,7 +193,7 @@ The `kaggle_t4` profile keeps the same staged pipeline but reduces runtime press
 - `max_eval_examples_per_subset: None -> 2`
 - Phase D override: `max_completion_length: 320 -> 96`
 
-## Outputs
+## Outputs 📦
 
 Each checkpoint evaluation writes artifacts such as:
 
@@ -203,20 +213,20 @@ Run-level alias files are written under `outputs_staged/<phase>/aliases/` for:
 - `best_correctness`
 - `best_composite`
 
-## Paper And Reporting
+## Paper And Reporting 📝
 
-Main paper sources and outputs live under [paper/iclr2026_template](paper/iclr2026_template).
+Main paper sources and outputs live under `paper/iclr2026_template`.
 
 Current paper/report entrypoints:
 
 - arXiv-ready paper source:
-  - [paper/iclr2026_template/staged_metric_gated_grpo_camera_ready.tex](paper/iclr2026_template/staged_metric_gated_grpo_camera_ready.tex)
+  - `paper/iclr2026_template/staged_metric_gated_grpo_camera_ready.tex`
 - compiled paper:
-  - [paper/iclr2026_template/staged_metric_gated_grpo_camera_ready.pdf](paper/iclr2026_template/staged_metric_gated_grpo_camera_ready.pdf)
+  - `paper/iclr2026_template/staged_metric_gated_grpo_camera_ready.pdf`
 - results package summary:
-  - [results/README.md](results/README.md)
+  - `results/README.md`
 - archived result summary:
-  - [results/report_summary.md](results/report_summary.md)
+  - `results/report_summary.md`
 
 Regenerate plots and tables with:
 
@@ -224,7 +234,7 @@ Regenerate plots and tables with:
 python3 scripts/generate_results_report.py
 ```
 
-## Tests
+## Tests ✅
 
 Run the unit tests with:
 
@@ -245,6 +255,4 @@ Current local status: `28` tests pass.
 
 ## Citation
 
-If you use this repository, cite the paper artifact under [paper/iclr2026_template](paper/iclr2026_template) and link the repository:
-
-- https://github.com/kgaero/RL_GSPO_Qwen2.5VLM
+Citation information will be added after the paper is uploaded to arXiv.
