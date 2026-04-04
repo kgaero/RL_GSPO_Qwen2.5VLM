@@ -1,4 +1,4 @@
-\begin{thebibliography}{13}
+\begin{thebibliography}{14}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -52,6 +52,11 @@ Ji~Qi, Ming Ding, Weihan Wang, Yushi Bai, Qingsong Lv, Wenyi Hong, Bin Xu, Lei H
 Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, Y.~K. Li, Y.~Wu, and Daya Guo.
 \newblock Deepseekmath: Pushing the limits of mathematical reasoning in open language models, 2024.
 \newblock URL \url{https://arxiv.org/abs/2402.03300}.
+
+\bibitem[Shen et~al.(2025)Shen, Wei, Qu, and Cheng]{shen2025satori}
+Chuming Shen, Wei Wei, Xiaoye Qu, and Yu~Cheng.
+\newblock Satori-r1: Incentivizing multimodal reasoning through explicit visual anchoring, 2025.
+\newblock URL \url{https://arxiv.org/abs/2505.19094}.
 
 \bibitem[Wei et~al.(2025)Wei, Li, Zheng, Wang, Wang, Kong, Sun, and Huang]{wei2025coldstart}
 Lai Wei, Yuting Li, Kaipeng Zheng, Chen Wang, Yue Wang, Linghe Kong, Lichao Sun, and Weiran Huang.

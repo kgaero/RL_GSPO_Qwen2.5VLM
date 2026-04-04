@@ -235,13 +235,13 @@ INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/adobe/courier/pcrr8r.tfm
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/adobe/times/ptmr7t.tfm
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/adobe/courier/pcrr7t.tfm
-INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/adobe/times/ptmr7t.tfm
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/vf/adobe/times/ptmb7t.vf
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/adobe/times/ptmb8r.tfm
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/vf/adobe/times/ptmr7t.vf
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/vf/adobe/courier/pcrr7t.vf
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/adobe/courier/pcrr8r.tfm
+INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/adobe/times/ptmr7t.tfm
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/public/cm/cmr9.tfm
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/public/cm/cmr6.tfm
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/public/cm/cmmi9.tfm
@@ -261,9 +261,9 @@ INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmmib6.t
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy9.tfm
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy6.tfm
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/adobe/times/ptmr7t.tfm
-INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/vf/adobe/times/ptmr7t.vf
 INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
+INPUT /home/kgaer/.TinyTeX/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm
 INPUT ../../results/plots/evolution_panels_notebook_paper.pdf
 INPUT ../../results/plots/evolution_panels_notebook_paper.pdf
 INPUT ../../results/plots/evolution_panels_notebook_paper.pdf

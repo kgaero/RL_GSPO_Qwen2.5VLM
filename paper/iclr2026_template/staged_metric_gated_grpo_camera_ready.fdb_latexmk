@@ -1,13 +1,13 @@
 # Fdb version 4
-["bibtex staged_metric_gated_grpo_camera_ready"] 1775231225.23584 "staged_metric_gated_grpo_camera_ready.aux" "staged_metric_gated_grpo_camera_ready.bbl" "staged_metric_gated_grpo_camera_ready" 1775231226.90286 0
+["bibtex staged_metric_gated_grpo_camera_ready"] 1775283555.53548 "staged_metric_gated_grpo_camera_ready.aux" "staged_metric_gated_grpo_camera_ready.bbl" "staged_metric_gated_grpo_camera_ready" 1775283556.63856 0
   "./iclr2026_conference.bst" 1775192916.3093 26973 af983813ca1a1414954dbceae7baa2a1 ""
-  "./staged_metric_gated_grpo_camera_ready.bib" 1775231047.77197 6066 12b4dfe84368c28407f4d6b9ff47e29a ""
-  "staged_metric_gated_grpo_camera_ready.aux" 1775231226.77291 9258 3a6be0675e8b32aca2ade11c90a31ecd "pdflatex"
+  "./staged_metric_gated_grpo_camera_ready.bib" 1775281493.52437 6378 aa27d08a601ef3d8204e4207eaec3896 ""
+  "staged_metric_gated_grpo_camera_ready.aux" 1775283556.53104 9430 70a3106d7378e01b57f078832c4e4fbb "pdflatex"
   (generated)
   "staged_metric_gated_grpo_camera_ready.bbl"
   "staged_metric_gated_grpo_camera_ready.blg"
   (rewritten before read)
-["pdflatex"] 1775231225.25757 "staged_metric_gated_grpo_camera_ready.tex" "staged_metric_gated_grpo_camera_ready.pdf" "staged_metric_gated_grpo_camera_ready" 1775231226.90385 0
+["pdflatex"] 1775283555.54882 "staged_metric_gated_grpo_camera_ready.tex" "staged_metric_gated_grpo_camera_ready.pdf" "staged_metric_gated_grpo_camera_ready" 1775283556.63875 0
   "../../results/plots/evolution_panels_notebook_paper.pdf" 1775211813.06008 66122 a632e7195332158e5967ce753ed9de8d ""
   "../../results/plots/staged_training_pipeline_better.png" 1775192031.99745 322720 c84449b154ca9d6b5642e27450f75536 ""
   "/home/kgaer/.TinyTeX/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
@@ -142,10 +142,10 @@
   "iclr2026_conference.sty" 1775192916.3133 9025 a040392a6cfee8dc54aae17eb2635282 ""
   "math_commands.tex" 1775192916.3093 12284 a71653715108dc62b66e3a0bde0307d8 ""
   "natbib.sty" 1775192916.3133 45154 40088ce024445d7ee2bca59e704cdd01 ""
-  "staged_metric_gated_grpo_camera_ready.aux" 1775231226.77291 9258 3a6be0675e8b32aca2ade11c90a31ecd "pdflatex"
-  "staged_metric_gated_grpo_camera_ready.bbl" 1775231225.24681 5916 7cbd3108776f925371a0ddde715a52ab "bibtex staged_metric_gated_grpo_camera_ready"
-  "staged_metric_gated_grpo_camera_ready.out" 1775231226.77677 3961 e538e6eab025960d9708f0d0f613d96e "pdflatex"
-  "staged_metric_gated_grpo_camera_ready.tex" 1775231216.97705 32314 14329a99ac82c33b31909143c4751dd3 ""
+  "staged_metric_gated_grpo_camera_ready.aux" 1775283556.53104 9430 70a3106d7378e01b57f078832c4e4fbb "pdflatex"
+  "staged_metric_gated_grpo_camera_ready.bbl" 1775283555.53997 6184 f463fc20a733d48750e633cebc034424 "bibtex staged_metric_gated_grpo_camera_ready"
+  "staged_metric_gated_grpo_camera_ready.out" 1775283556.53487 3961 e538e6eab025960d9708f0d0f613d96e "pdflatex"
+  "staged_metric_gated_grpo_camera_ready.tex" 1775283551.82438 32607 731a9e8b8b8df2c5963407beedba23e4 ""
   (generated)
   "staged_metric_gated_grpo_camera_ready.aux"
   "staged_metric_gated_grpo_camera_ready.log"

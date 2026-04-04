@@ -61,14 +61,14 @@ All statements below are grounded in the following implementation modules:
 
 \section{Background: GRPO Versus the Contribution of This Paper}
 
-Our implementation uses TRL's \texttt{GRPOTrainer} as its optimization backend. The methodological contribution analyzed in the main paper lies outside the core GRPO update:
+Our implementation uses TRL's \texttt{GRPOTrainer} as its optimization backend. The methodological contribution analyzed in the main paper is the fine-tuning pipeline built around that backend rather than a new GRPO objective:
 \begin{itemize}[leftmargin=1.2em]
 \item staged curriculum construction over filtered MathVista subsets,
 \item a structured response contract,
 \item metric-gated reward reweighting after checkpoint evaluation, and
 \item alias-based checkpoint selection for continuation.
 \end{itemize}
-GRPO itself provides the policy-optimization backbone: the trainer samples multiple completions for a prompt, evaluates them under a reward function, and updates the policy from relative within-group performance rather than from PPO-style clipped ratios. The contribution in this work is the training system built around that optimizer: filtered curricula, metric-gated reward adaptation, and checkpoint-aware continuation. This distinction is important because the optimization objective remains standard TRL GRPO, while the staged controller determines when structure is emphasized and when correctness pressure is increased.
+GRPO itself provides the policy-optimization backbone: the trainer samples multiple completions for a prompt, evaluates them under a reward function, and updates the policy from relative within-group performance rather than from PPO-style clipped ratios. The contribution in this work is the fine-tuning pipeline built around that optimizer: filtered curricula, metric-gated reward adaptation, checkpoint-aware continuation, and auditable transfer semantics. This distinction is important because the optimization objective remains standard TRL GRPO, while the staged controller and continuation logic determine how the pipeline prioritizes structure, correctness, and checkpoint selection over time.
 
 \section{Full Reward Specification}
 
@@ -286,9 +286,9 @@ This distinction is important for the claims in the paper. Cross-phase continuat
 
 The implementation contains scaffolding for a multi-choice branch and an optional robustness stage, but neither path provides the main evidence used in the paper. Similarly, the runner logs when multiple GPUs are visible but does not automatically switch to DDP or tensor parallelism. The strongest claims are therefore:
 \begin{itemize}[leftmargin=1.2em]
-\item about staged RL dynamics for numeric visual reasoning,
+\item about staged GRPO fine-tuning pipeline dynamics for numeric visual reasoning,
 \item about metric-gated control under non-monotonic checkpoint trajectories, and
-\item about making a single-GPU GRPO pipeline more auditable and reproducible.
+\item about making a single-GPU GRPO fine-tuning pipeline more auditable and reproducible.
 \end{itemize}
 
 \end{document}

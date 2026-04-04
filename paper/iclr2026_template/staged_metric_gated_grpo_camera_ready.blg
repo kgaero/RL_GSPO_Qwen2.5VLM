@@ -3,44 +3,44 @@ Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: staged_metric_gated_grpo_camera_ready.aux
 The style file: iclr2026_conference.bst
 Database file #1: staged_metric_gated_grpo_camera_ready.bib
-You've used 13 entries,
+You've used 14 entries,
             2773 wiz_defined-function locations,
-            648 strings with 8918 characters,
-and the built_in function-call counts, 10954 in all, are:
-= -- 777
-> -- 1352
+            652 strings with 9098 characters,
+and the built_in function-call counts, 11416 in all, are:
+= -- 814
+> -- 1391
 < -- 0
-+ -- 451
-- -- 438
-* -- 1099
-:= -- 1827
-add.period$ -- 44
-call.type$ -- 13
-change.case$ -- 184
-chr.to.int$ -- 13
-cite$ -- 26
-duplicate$ -- 248
-empty$ -- 470
-format.name$ -- 451
-if$ -- 2135
++ -- 464
+- -- 450
+* -- 1139
+:= -- 1899
+add.period$ -- 47
+call.type$ -- 14
+change.case$ -- 191
+chr.to.int$ -- 14
+cite$ -- 28
+duplicate$ -- 264
+empty$ -- 503
+format.name$ -- 464
+if$ -- 2230
 int.to.chr$ -- 1
 int.to.str$ -- 1
 missing$ -- 5
-newline$ -- 78
-num.names$ -- 52
-pop$ -- 407
+newline$ -- 83
+num.names$ -- 56
+pop$ -- 424
 preamble$ -- 1
-purify$ -- 171
+purify$ -- 177
 quote$ -- 0
-skip$ -- 311
+skip$ -- 328
 stack$ -- 0
-substring$ -- 26
-swap$ -- 18
+substring$ -- 28
+swap$ -- 19
 text.length$ -- 0
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 143
+type$ -- 154
 warning$ -- 0
-while$ -- 39
+while$ -- 42
 width$ -- 0
-write$ -- 173
+write$ -- 185
